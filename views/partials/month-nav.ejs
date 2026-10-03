@@ -1,0 +1,14 @@
+<%
+  const prev = monthKey(shiftMonth(ym, -1));
+  const next = monthKey(shiftMonth(ym, 1));
+  const sep = navBase.includes('?') ? '&' : '?';
+%>
+<div class="month-nav" role="navigation" aria-label="Monat wählen">
+  <a href="<%= navBase %><%= sep %>monat=<%= prev %>" aria-label="Vorheriger Monat">‹</a>
+  <strong><%= monthLabel(ym) %></strong>
+  <% if (isCurrentMonth) { %>
+    <span class="disabled" aria-hidden="true">›</span>
+  <% } else { %>
+    <a href="<%= navBase %><%= sep %>monat=<%= next %>" aria-label="Nächster Monat">›</a>
+  <% } %>
+</div>

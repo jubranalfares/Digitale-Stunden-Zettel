@@ -1,0 +1,12 @@
+<div class="sigpad" data-sigpad <%= locals.required ? 'data-required' : '' %>>
+  <div class="sigpad-area">
+    <canvas aria-label="Unterschriftenfeld"></canvas>
+    <div class="sigpad-line"></div>
+    <span class="sigpad-hint">Hier mit dem Finger oder der Maus unterschreiben</span>
+  </div>
+  <div class="sigpad-actions">
+    <span class="sigpad-error" data-sigpad-error></span>
+    <button type="button" class="btn btn-ghost btn-small" data-sigpad-clear>Feld leeren</button>
+  </div>
+  <input type="hidden" name="unterschrift" data-sigpad-input>
+</div>

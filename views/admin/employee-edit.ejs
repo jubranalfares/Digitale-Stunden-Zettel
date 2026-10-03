@@ -1,0 +1,51 @@
+<%- include('../partials/header') %>
+<div class="page-head">
+  <div>
+    <h1><%= target.name %></h1>
+    <div class="sub"><a href="/admin/mitarbeiter">← Alle Mitarbeiter</a><% if (target.role === 'employee') { %> · <a href="/admin/zettel/<%= target.id %>">Stundenzettel ansehen</a><% } %></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Stammdaten</h2>
+  <% if (error) { %><div class="flash flash-error" role="alert"><%= error %></div><% } %>
+  <form method="post" action="/admin/mitarbeiter/<%= target.id %>" class="form-grid">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label>Vor- und Nachname <input name="name" value="<%= values.name %>" required></label>
+    <label>Benutzername <input name="benutzername" value="<%= values.username %>" autocapitalize="none" required pattern="[A-Za-z0-9._@\-]{3,40}"></label>
+    <label>Personalnummer <input name="persnr" value="<%= values.personnel_no %>"></label>
+    <label>Rolle
+      <select name="rolle">
+        <option value="employee" <%= values.role !== 'admin' ? 'selected' : '' %>>Mitarbeiter</option>
+        <option value="admin" <%= values.role === 'admin' ? 'selected' : '' %>>Chef/Admin</option>
+      </select>
+    </label>
+    <label class="check"><input type="checkbox" name="einsatzliste" value="1" <%= values.on_roster ? 'checked' : '' %>> Auf der Einsatzliste führen</label>
+    <label class="check"><input type="checkbox" name="aktiv" value="1" <%= values.active ? 'checked' : '' %>> Aktiv (darf sich anmelden)</label>
+    <p class="full muted small" style="margin:0">Ausgeschiedene Mitarbeiter bitte nur deaktivieren – ihre Stundenzettel bleiben für die Aufbewahrungspflicht erhalten.</p>
+    <div class="full form-actions"><button class="btn btn-primary" type="submit">Speichern</button></div>
+  </form>
+</div>
+
+<% if (target.role === 'employee') { %>
+<div class="card">
+  <h2>Unterschrift</h2>
+  <% if (signature) { %>
+    <div class="sig-preview"><img src="/signatur/<%= signature.id %>.png" alt="Unterschrift von <%= target.name %>"></div>
+    <p class="muted small" style="margin-top:8px">Hinterlegt am <%= formatDateDE(signature.created_at.slice(0, 10)) %>. Nur der Mitarbeiter selbst kann seine Unterschrift ändern.</p>
+  <% } else { %>
+    <p class="muted">Noch keine Unterschrift hinterlegt – der Mitarbeiter wird bei der ersten Anmeldung dazu aufgefordert.</p>
+  <% } %>
+</div>
+<% } %>
+
+<div class="card">
+  <h2>Neues Startpasswort</h2>
+  <p class="muted small">Falls das Passwort vergessen wurde. Bei der nächsten Anmeldung muss ein eigenes Passwort vergeben werden.</p>
+  <form method="post" action="/admin/mitarbeiter/<%= target.id %>/passwort" class="form-grid">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label>Startpasswort <input name="passwort" value="<%= suggestedPassword %>" minlength="8" required autocomplete="off"></label>
+    <div class="form-actions" style="align-self:end;margin:0"><button class="btn" type="submit">Passwort setzen</button></div>
+  </form>
+</div>
+<%- include('../partials/footer') %>

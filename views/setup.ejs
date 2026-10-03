@@ -1,0 +1,33 @@
+<%- include('partials/header', { bare: true }) %>
+<div class="auth-wrap">
+  <div class="card auth-card wide">
+    <div class="auth-brand">
+      <span class="brand-mark" aria-hidden="true">⏱</span>
+      <div><strong>Digitale Stundenzettel</strong><span>Ersteinrichtung</span></div>
+    </div>
+    <h1>Willkommen! Zuerst den Chef-Zugang anlegen</h1>
+    <p class="muted">Mit diesem Zugang sehen Sie alle Stundenzettel, legen Mitarbeiter an und exportieren die PDFs für den Steuerberater.</p>
+    <% if (error) { %><div class="flash flash-error" role="alert"><%= error %></div><% } %>
+    <form method="post" action="/setup" class="form-grid">
+      <label class="full">Name des Betriebs <span class="hint">(erscheint als „Firma“ auf den Formularen)</span>
+        <input name="firma" value="<%= values.company || '' %>" placeholder="z. B. Eiscafé Taormina" required>
+      </label>
+      <label>Ihr Name
+        <input name="name" value="<%= values.name || '' %>" autocomplete="name" required>
+      </label>
+      <label>Benutzername
+        <input name="benutzername" value="<%= values.username || '' %>" autocomplete="username" autocapitalize="none" required>
+      </label>
+      <label>Passwort <span class="hint">(mind. 8 Zeichen)</span>
+        <input type="password" name="passwort" autocomplete="new-password" minlength="8" required>
+      </label>
+      <label>Passwort wiederholen
+        <input type="password" name="passwort2" autocomplete="new-password" minlength="8" required>
+      </label>
+      <div class="full form-actions">
+        <button class="btn btn-primary" type="submit">Einrichten</button>
+      </div>
+    </form>
+  </div>
+</div>
+<%- include('partials/footer') %>

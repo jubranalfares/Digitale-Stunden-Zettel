@@ -1,0 +1,71 @@
+<%- include('partials/header') %>
+<div class="page-head"><h1>Einstellungen</h1></div>
+
+<% if (welcome) { %>
+  <div class="flash flash-success">Eingerichtet! Hinterlegen Sie jetzt Ihre Unterschrift als Arbeitgeber und legen Sie danach Ihre Mitarbeiter an.</div>
+<% } %>
+
+<div class="card" id="unterschrift">
+  <h2><%= isAdmin ? 'Unterschrift des Arbeitgebers' : 'Meine Unterschrift' %></h2>
+  <p class="muted small">
+    <% if (isAdmin) { %>
+      Einmal hinterlegen – sie erscheint automatisch auf jedem Stundenzettel und auf der Einsatzliste, jeweils mit dem passenden Datum.
+    <% } else { %>
+      Einmal hinterlegen – sie wird bei jedem Eintrag automatisch auf Ihren Stundenzettel und die Einsatzliste gesetzt.
+    <% } %>
+  </p>
+  <% if (signature) { %>
+    <p class="small" style="margin-bottom:6px"><strong>Aktuell hinterlegt</strong> <span class="muted">(seit <%= formatDateDE(signature.created_at.slice(0, 10)) %>)</span></p>
+    <div class="sig-preview" style="margin-bottom:16px"><img src="/signatur/<%= signature.id %>.png" alt="Hinterlegte Unterschrift"></div>
+    <p class="small muted">Neue Unterschrift? Einfach unten neu unterschreiben und speichern. Bereits unterschriebene Einträge behalten ihre bisherige Unterschrift.</p>
+  <% } %>
+  <form method="post" action="/einstellungen/unterschrift" data-signature-form>
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <%- include('partials/signature-pad', { required: true }) %>
+    <div class="form-actions"><button class="btn btn-primary" type="submit">Unterschrift speichern</button></div>
+  </form>
+</div>
+
+<% if (isAdmin) { %>
+<div class="card" id="betrieb">
+  <h2>Betrieb &amp; Formulare</h2>
+  <form method="post" action="/einstellungen/betrieb" class="form-grid">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label>Firma <span class="hint">(auf allen Formularen)</span> <input name="firma" value="<%= settings.company_name %>" required maxlength="80"></label>
+    <label>Titel der Einsatzliste <input name="titel" value="<%= settings.roster_title %>" maxlength="80"></label>
+    <div class="full">
+      <label>Logo oben rechts auf dem Stundenzettel <span class="hint">(PNG oder JPEG, optional)</span>
+        <input type="file" accept="image/png,image/jpeg" data-logo-file>
+      </label>
+      <input type="hidden" name="logo" data-logo-input>
+      <div class="sig-preview <%= settings.logo ? '' : 'hidden' %>" style="margin-top:10px" data-logo-preview-wrap>
+        <img src="<%= settings.logo ? '/logo?v=' + settings.logo.length : '' %>" alt="Logo" data-logo-preview>
+      </div>
+      <% if (settings.logo) { %>
+        <label class="check" style="margin-top:8px"><input type="checkbox" name="logo_entfernen" value="1"> Logo entfernen</label>
+      <% } %>
+    </div>
+    <div class="full form-actions"><button class="btn btn-primary" type="submit">Speichern</button></div>
+  </form>
+</div>
+<% } %>
+
+<% if (isAdmin) { %>
+<div class="card" id="sicherung">
+  <h2>Datensicherung</h2>
+  <p class="muted small">Alle Stundenzettel, Unterschriften und Mitarbeiter in einer Datei. Am besten monatlich nach dem Export herunterladen und sicher aufbewahren (Arbeitszeitnachweise mindestens 2 Jahre aufbewahren).</p>
+  <a class="btn" href="/admin/sicherung">Sicherung herunterladen</a>
+</div>
+<% } %>
+
+<div class="card" id="passwort">
+  <h2>Passwort ändern</h2>
+  <form method="post" action="/einstellungen/passwort" class="form-grid">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label class="full">Aktuelles Passwort <input type="password" name="aktuell" autocomplete="current-password" required></label>
+    <label>Neues Passwort <span class="hint">(mind. 8 Zeichen)</span> <input type="password" name="passwort" autocomplete="new-password" minlength="8" required></label>
+    <label>Neues Passwort wiederholen <input type="password" name="passwort2" autocomplete="new-password" minlength="8" required></label>
+    <div class="full form-actions"><button class="btn" type="submit">Passwort ändern</button></div>
+  </form>
+</div>
+<%- include('partials/footer') %>

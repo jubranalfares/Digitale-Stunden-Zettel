@@ -1,0 +1,74 @@
+<%#
+  Nachbildung "Vorlage zur Dokumentation der täglichen Arbeitszeit". Maße: src/layout.js (DATEV).
+%>
+<%
+  const L = DATEV;
+  const T = L.table;
+  const col = Object.fromEntries(T.cols.map((c) => [c.key, c]));
+  const S = L.signatures;
+  const K = L.key;
+  const codes = Object.entries(CODES);
+  const fields = [['firma', sheet.company], ['name', sheet.employee.name], ['persNr', sheet.employee.personnelNo], ['month', sheet.monthLabel]];
+  const selected = locals.selectedDate || '';
+%>
+<div class="paper-wrap">
+  <div class="paper datev" role="img" aria-label="Stundenzettel <%= sheet.employee.name %>, <%= sheet.monthLabel %>">
+    <div class="abs" style="<%= at(L.left, L.title.y) %>;font-size:<%= pt(L.title.size) %>"><%= L.title.text %></div>
+    <% for (const [key, value] of fields) { const f = L.fields[key]; %>
+      <div class="abs" style="<%= at(f.labelX ?? L.left, f.labelY) %>;font-size:<%= pt(L.labelSize) %>"><%= f.label %></div>
+      <div class="abs box" style="<%= rect(f.box) %>;font-size:<%= pt(L.valueSize) %>"><%= value %></div>
+    <% } %>
+    <% if (sheet.logo) { %><img class="fit" src="/logo" alt="" style="<%= rect(L.logo) %>"><% } %>
+
+    <table class="datev-table" style="<%= rect({ x: L.left, y: T.top, w: L.width, h: T.bottom - T.top }) %>">
+      <colgroup><% T.cols.forEach((c) => { %><col style="width:<%= pt(c.w) %>"><% }) %></colgroup>
+      <thead>
+        <tr style="height:<%= pt(T.headerH) %>;font-size:<%= pt(T.headerSize) %>">
+          <% T.cols.forEach((c) => { %><th scope="col"><%- c.label.join('<br>') %></th><% }) %>
+        </tr>
+      </thead>
+      <tbody style="font-size:<%= pt(T.bodySize) %>">
+        <tr style="height:<%= pt(T.rowH) %>"><% T.cols.forEach(() => { %><td></td><% }) %></tr>
+        <% sheet.rows.forEach((r) => { %>
+          <tr style="height:<%= pt(T.rowH) %>"
+              class="<%= r.exists ? '' : 'missing' %> <%= r.date && r.date === selected ? 'is-selected' : '' %>"
+              <% if (locals.interactive && r.exists) { %>data-date="<%= r.date %>"<% } %>>
+            <td><%= r.day %></td>
+            <td><%= r.start || '' %></td>
+            <td><%= r.breakTime || '' %></td>
+            <td><%= r.end || '' %></td>
+            <td><%= r.duration || '' %></td>
+            <td class="code"><%= r.code || '' %></td>
+            <td class="ag"><%= r.recordedOn || '' %><% if (r.recordedByEmployer) { %> <small title="vom Arbeitgeber erfasst bzw. korrigiert">AG</small><% } %></td>
+            <td class="remarks" title="<%= r.remarks || '' %>"><%= r.remarks || '' %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+
+    <div class="abs" style="left:<%= pt(col.end.x - 30) %>;top:<%= pt(L.summe.y) %>;width:<%= pt(col.end.w + 22) %>;text-align:right;font-weight:700;font-size:<%= pt(L.summe.size) %>">Summe:</div>
+    <div class="abs" style="left:<%= pt(col.duration.x) %>;top:<%= pt(L.summe.y - 1) %>;width:<%= pt(col.duration.w) %>;text-align:center;font-weight:700;font-size:<%= pt(9) %>"><%= sheet.totalMinutes ? sheet.total : '' %></div>
+    <div class="line" style="left:<%= pt(col.duration.x + 2) %>;top:<%= pt(L.summe.y + 10.5) %>;width:<%= pt(col.duration.w - 4) %>"></div>
+    <div class="line" style="left:<%= pt(col.duration.x + 2) %>;top:<%= pt(L.summe.y + 12.6) %>;width:<%= pt(col.duration.w - 4) %>"></div>
+
+    <% for (const [key, sig] of [['employee', sheet.employeeSignature], ['employer', sheet.employerSignature]]) { const p = S[key]; %>
+      <div class="line" style="left:<%= pt(p.x1) %>;top:<%= pt(S.lineY) %>;width:<%= pt(p.x2 - p.x1) %>"></div>
+      <div class="abs" style="left:<%= pt(p.dateX - 30) %>;top:<%= pt(S.lineY + 3) %>;width:<%= pt(60) %>;text-align:center;font-size:<%= pt(S.labelSize) %>">Datum</div>
+      <div class="abs" style="left:<%= pt(p.labelX - 70) %>;top:<%= pt(S.lineY + 3) %>;width:<%= pt(140) %>;text-align:center;font-size:<%= pt(S.labelSize) %>"><%= p.label %></div>
+      <% if (sig) { %>
+        <div class="abs" style="left:<%= pt(p.dateX - 30) %>;top:<%= pt(S.lineY - 12) %>;width:<%= pt(60) %>;text-align:center;font-size:<%= pt(9) %>"><%= sig.dateLabel %></div>
+        <img class="sig-img" src="/signatur/<%= sig.id %>.png" alt="<%= p.label %>" style="<%= rect({ x: p.dateX + 32, y: S.lineY - 34, w: p.x2 - p.dateX - 34, h: 33 }) %>">
+      <% } %>
+    <% } %>
+
+    <div class="abs" style="<%= at(L.left - 3, L.note.y) %>;font-weight:700;font-size:<%= pt(L.note.size) %>"><%= L.note.text %></div>
+    <div class="abs datev-key" style="<%= rect({ x: K.x, y: K.y, w: K.w, h: codes.length * K.rowH }) %>;font-size:<%= pt(K.size) %>">Schlüssel</div>
+    <% codes.forEach(([code, text], i) => { %>
+      <div class="abs" style="<%= at(K.codeX, K.y + i * K.rowH + 1.2) %>;font-size:<%= pt(K.size) %>"><%= code %></div>
+      <div class="abs" style="<%= at(K.textX, K.y + i * K.rowH + 1.2) %>;font-size:<%= pt(K.size) %>"><%= text %></div>
+    <% }) %>
+    <% if (sheet.rows.some((r) => r.recordedByEmployer)) { %>
+      <div class="abs" style="<%= at(L.left, K.y + codes.length * K.rowH + 8) %>;font-size:<%= pt(7) %>;color:#444">AG = vom Arbeitgeber erfasst bzw. korrigiert</div>
+    <% } %>
+  </div>
+</div>

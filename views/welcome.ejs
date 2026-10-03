@@ -1,0 +1,31 @@
+<%- include('partials/header', { bare: true }) %>
+<div class="auth-wrap">
+  <div class="card auth-card wide">
+    <div class="auth-brand">
+      <span class="brand-mark" aria-hidden="true">⏱</span>
+      <div><strong>Digitale Stundenzettel</strong><span><%= settings.company_name %></span></div>
+    </div>
+    <h1>Willkommen, <%= user.name %>!</h1>
+    <p class="muted">Bitte einmalig ein eigenes Passwort vergeben<% if (user.role === 'employee') { %> und unterschreiben. Ihre Unterschrift wird danach bei jedem Eintrag automatisch auf Ihren Stundenzettel und die Einsatzliste gesetzt – Sie müssen nie wieder von Hand unterschreiben<% } %>.</p>
+    <% if (error) { %><div class="flash flash-error" role="alert"><%= error %></div><% } %>
+    <form method="post" action="/willkommen" class="stack" data-signature-form>
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <div class="form-grid">
+        <label>Neues Passwort <span class="hint">(mind. 8 Zeichen)</span>
+          <input type="password" name="passwort" autocomplete="new-password" minlength="8" required>
+        </label>
+        <label>Passwort wiederholen
+          <input type="password" name="passwort2" autocomplete="new-password" minlength="8" required>
+        </label>
+      </div>
+      <% if (user.role === 'employee') { %>
+        <div>
+          <label style="margin-bottom:6px">Ihre Unterschrift</label>
+          <%- include('partials/signature-pad', { required: true }) %>
+        </div>
+      <% } %>
+      <button class="btn btn-primary btn-block" type="submit">Speichern und loslegen</button>
+    </form>
+  </div>
+</div>
+<%- include('partials/footer') %>

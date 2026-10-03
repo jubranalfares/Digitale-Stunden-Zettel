@@ -1,0 +1,58 @@
+<%- include('../partials/header') %>
+<div class="page-head">
+  <div>
+    <h1>Mitarbeiter</h1>
+    <div class="sub">Zugänge anlegen und verwalten</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table class="data-table">
+      <thead>
+        <tr><th>Name</th><th>Benutzername</th><th class="hide-mobile">Pers.-Nr.</th><th class="hide-mobile">Einsatzliste</th><th>Unterschrift</th><th class="actions"></th></tr>
+      </thead>
+      <tbody>
+        <% users.forEach((u) => { %>
+          <tr class="<%= u.active ? '' : 'inactive' %>">
+            <td>
+              <strong><%= u.name %></strong>
+              <% if (u.role === 'admin') { %> <span class="chip chip-accent">Chef/Admin</span><% } %>
+              <% if (!u.active) { %> <span class="chip">inaktiv</span><% } %>
+              <% if (u.must_change_password) { %> <span class="chip chip-warn">noch nicht angemeldet</span><% } %>
+            </td>
+            <td><%= u.username %></td>
+            <td class="hide-mobile"><%= u.personnel_no || '–' %></td>
+            <td class="hide-mobile"><%= u.role === 'employee' ? (u.on_roster ? 'ja' : 'nein') : '–' %></td>
+            <td><% if (u.role === 'admin') { %>–<% } else if (u.signature_id) { %><span class="chip chip-ok">✓</span><% } else { %><span class="chip chip-danger">fehlt</span><% } %></td>
+            <td class="actions"><a class="btn btn-small" href="/admin/mitarbeiter/<%= u.id %>">Bearbeiten</a></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card" id="neu">
+  <h2>Neuen Mitarbeiter anlegen</h2>
+  <p class="muted small">Der Mitarbeiter meldet sich mit dem Startpasswort an, vergibt ein eigenes Passwort und hinterlegt einmalig seine Unterschrift.</p>
+  <% if (error) { %><div class="flash flash-error" role="alert"><%= error %></div><% } %>
+  <form method="post" action="/admin/mitarbeiter" class="form-grid">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label>Vor- und Nachname <input name="name" value="<%= values.name || '' %>" required></label>
+    <label>Benutzername <span class="hint">(zum Anmelden)</span>
+      <input name="benutzername" value="<%= values.username || '' %>" autocapitalize="none" autocomplete="off" required pattern="[A-Za-z0-9._@\-]{3,40}">
+    </label>
+    <label>Personalnummer <span class="hint">(optional)</span> <input name="persnr" value="<%= values.personnel_no || '' %>"></label>
+    <label>Startpasswort <input name="passwort" value="<%= suggestedPassword %>" minlength="8" required autocomplete="off"></label>
+    <label>Rolle
+      <select name="rolle">
+        <option value="employee" <%= values.role !== 'admin' ? 'selected' : '' %>>Mitarbeiter (eigener Stundenzettel)</option>
+        <option value="admin" <%= values.role === 'admin' ? 'selected' : '' %>>Chef/Admin (sieht alle Zettel)</option>
+      </select>
+    </label>
+    <label class="check" style="align-self:end;min-height:44px"><input type="checkbox" name="einsatzliste" value="1" <%= values.on_roster ? 'checked' : '' %>> Auf der Einsatzliste führen</label>
+    <div class="full form-actions"><button class="btn btn-primary" type="submit">Mitarbeiter anlegen</button></div>
+  </form>
+</div>
+<%- include('../partials/footer') %>

@@ -1,0 +1,66 @@
+<%#
+  Nachbildung der Einsatzliste (alle Mitarbeiter, 8 pro Blatt). Maße: src/layout.js (ROSTER).
+%>
+<%
+  const R = ROSTER;
+  const T = R.table;
+  const nameSize = (name) => (name.length > 13 ? 8 : T.nameSize);
+%>
+<div class="paper-wrap">
+  <div class="paper roster" role="img" aria-label="<%= roster.title %>, <%= roster.monthLabel %>">
+    <div class="abs" style="<%= at(R.heading.x, R.heading.companyY) %>;font-size:<%= pt(R.heading.size) %>"><%= roster.company %></div>
+    <div class="abs" style="<%= at(R.heading.x, R.heading.titleY) %>;font-size:<%= pt(R.heading.size) %>"><%= roster.title %></div>
+    <div class="abs" style="<%= at(R.month.x, R.month.y) %>;font-size:<%= pt(R.month.size) %>"><%= R.month.label %>&nbsp; <%= roster.monthLabel %></div>
+    <% if (roster.pages.length > 1) { %>
+      <div class="abs" style="<%= at(R.month.x, R.month.y + 18) %>;font-size:<%= pt(9) %>">Blatt <%= pageIndex + 1 %> von <%= roster.pages.length %></div>
+    <% } %>
+
+    <table class="roster-table" style="<%= rect({ x: R.left, y: T.top, w: R.right - R.left, h: T.bottom - T.top }) %>">
+      <colgroup>
+        <col style="width:<%= pt(R.firstW) %>">
+        <% columns.forEach(() => { %><col style="width:<%= pt(R.colW) %>"><% }) %>
+      </colgroup>
+      <tr style="height:<%= pt(T.nameRowH) %>">
+        <td style="font-size:<%= pt(T.daySize) %>">Name</td>
+        <% columns.forEach((emp) => { %>
+          <td class="name" style="font-size:<%= pt(emp ? nameSize(emp.name) : T.nameSize) %>">
+            <% if (emp && locals.linkBase) { %><a href="<%= linkBase %>/<%= emp.id %>?monat=<%= roster.month %>"><%= emp.name %></a><% } else if (emp) { %><%= emp.name %><% } %>
+          </td>
+        <% }) %>
+      </tr>
+      <tr style="height:<%= pt(T.secondRowH) %>;font-size:<%= pt(8) %>;color:#333">
+        <td></td>
+        <% columns.forEach((emp) => { %><td><%= emp ? emp.personnelNo : '' %></td><% }) %>
+      </tr>
+      <% for (let d = 1; d <= 31; d++) { %>
+        <tr style="height:<%= pt(T.rowH) %>">
+          <td style="font-size:<%= pt(T.daySize) %>"><%= d %></td>
+          <% columns.forEach((emp) => { const c = emp && emp.days[d]; %>
+            <td><% if (c) { %>
+              <div class="rc" title="<%= emp.name %>, <%= d %>.: <%= c.timeRange || c.code %>">
+                <div class="rc-text" style="font-size:<%= pt(c.duration ? 8.5 : 9) %>">
+                  <% if (c.duration) { %><span><%= c.duration %></span><% } %>
+                  <% if (c.code) { %><span class="rc-code <%= c.duration ? '' : 'only' %>"><%= c.code %></span><% } %>
+                </div>
+                <% if (c.signatureId) { %><img src="/signatur/<%= c.signatureId %>.png" alt="Unterschrift"><% } else if (c.recordedByEmployer) { %><span class="rc-ag">AG</span><% } %>
+              </div>
+            <% } %></td>
+          <% }) %>
+        </tr>
+      <% } %>
+      <tr class="sum" style="height:<%= pt(T.sumRowH) %>">
+        <td style="font-size:<%= pt(10) %>">Summe</td>
+        <% columns.forEach((emp) => { %><td style="font-size:<%= pt(9.5) %>"><%= emp ? emp.total : '' %></td><% }) %>
+      </tr>
+    </table>
+
+    <% const E = R.employer; %>
+    <div class="line" style="left:<%= pt(E.x1) %>;top:<%= pt(E.lineY) %>;width:<%= pt(E.x2 - E.x1) %>;border-top-width:<%= pt(0.6) %>"></div>
+    <div class="abs" style="left:<%= pt(E.dateX - 30) %>;top:<%= pt(E.lineY + 3) %>;width:<%= pt(60) %>;text-align:center;font-size:<%= pt(E.size) %>">Datum</div>
+    <div class="abs" style="left:<%= pt(E.labelX - 80) %>;top:<%= pt(E.lineY + 3) %>;width:<%= pt(160) %>;text-align:center;font-size:<%= pt(E.size) %>"><%= E.label %></div>
+    <% if (roster.employerSignature) { %>
+      <div class="abs" style="left:<%= pt(E.dateX - 30) %>;top:<%= pt(E.lineY - 13) %>;width:<%= pt(60) %>;text-align:center;font-size:<%= pt(10) %>"><%= roster.employerSignature.dateLabel %></div>
+      <img class="sig-img" src="/signatur/<%= roster.employerSignature.id %>.png" alt="<%= E.label %>" style="<%= rect({ x: E.dateX + 40, y: E.lineY - 36, w: E.x2 - E.dateX - 42, h: 35 }) %>">
+    <% } %>
+  </div>
+</div>

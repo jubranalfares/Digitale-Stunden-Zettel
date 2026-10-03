@@ -1,0 +1,29 @@
+# Start: DOMAIN=stunden.example.de docker compose up -d
+# Caddy holt automatisch ein HTTPS-Zertifikat für die Domain.
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      TRUST_PROXY: "1"
+      APP_TIMEZONE: Europe/Berlin
+    volumes:
+      - stundenzettel-daten:/data
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?Bitte DOMAIN setzen, z. B. DOMAIN=stunden.example.de}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-daten:/data
+    depends_on:
+      - app
+
+volumes:
+  stundenzettel-daten:
+  caddy-daten:

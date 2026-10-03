@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#16302f">
+  <title><%= title ? `${title} · ` : '' %>Stundenzettel<%= settings.company_name ? ` · ${settings.company_name}` : '' %></title>
+  <link rel="stylesheet" href="/static/css/app.css">
+  <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/static/manifest.webmanifest">
+</head>
+<body>
+<% if (user && !locals.bare) {
+  const navActive = (href) => currentPath === href || (href !== '/admin' && currentPath.startsWith(href + '/')) ? 'active' : '';
+%>
+<header class="topbar">
+  <a class="brand" href="/">
+    <span class="brand-mark" aria-hidden="true">⏱</span>
+    <span>Stundenzettel<small><%= settings.company_name %></small></span>
+  </a>
+  <nav aria-label="Hauptnavigation">
+    <% if (user.role === 'admin') { %>
+      <a href="/admin" class="<%= navActive('/admin') || (currentPath.startsWith('/admin/zettel') ? 'active' : '') %>">Übersicht</a>
+      <a href="/admin/einsatzliste" class="<%= navActive('/admin/einsatzliste') %>">Einsatzliste</a>
+      <a href="/admin/mitarbeiter" class="<%= navActive('/admin/mitarbeiter') %>">Mitarbeiter</a>
+    <% } else { %>
+      <a href="/zettel" class="<%= navActive('/zettel') %>">Mein Stundenzettel</a>
+    <% } %>
+    <a href="/einstellungen" class="<%= navActive('/einstellungen') %>">Einstellungen</a>
+    <form method="post" action="/logout">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+      <button type="submit">Abmelden</button>
+    </form>
+  </nav>
+</header>
+<% } %>
+<main class="<%= locals.bare ? '' : 'container' %>">
+<% if (flash && !locals.bare) { %>
+  <div class="flash flash-<%= flash.type %>" role="status">
+    <%= flash.message %>
+    <% if (flash.details && flash.details.length) { %>
+      <ul><% flash.details.forEach((d) => { %><li><%= d %></li><% }) %></ul>
+    <% } %>
+  </div>
+<% } %>
