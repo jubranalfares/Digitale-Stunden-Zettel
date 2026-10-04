@@ -40,6 +40,7 @@
 <button type="button" class="theme-toggle theme-toggle-floating" data-theme-toggle aria-label="Hell/Dunkel umschalten" title="Hell/Dunkel umschalten"><span aria-hidden="true" data-theme-icon>◐</span></button>
 <% } %>
 <main class="<%= locals.bare ? '' : 'container' %>">
+<% if (locals.dbIsTemporary && locals.isOwner && !locals.bare) { %><%- include('db-temporary') %><% } %>
 <% if (flash && !locals.bare) { %>
   <div class="flash flash-<%= flash.type %>" role="status">
     <%= flash.message %>

@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { csrfProtection, requireLogin, sessionMiddleware } from './auth.js';
-import { databaseVariableNames } from './config.js';
+import { databaseVariableNames, isDeploymentDatabase } from './config.js';
 import { LazyDatabase } from './db.js';
 import { sendDataUrl } from './http.js';
 import { DATEV, ROSTER } from './layout.js';
@@ -80,6 +80,7 @@ export function createApp({ config, db = new LazyDatabase(config) }) {
     Object.assign(res.locals, {
       today: req.today, settings: { ...DEFAULT_SETTINGS }, currentPath: req.path, title: '',
       user: null, flash: null, csrfToken: '',
+      dbIsTemporary: isDeploymentDatabase(config.dbUrl ?? ''),
     });
     next();
   });

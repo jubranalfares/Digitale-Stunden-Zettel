@@ -45,3 +45,12 @@ test('Zwei gleichzeitig startende Server aktualisieren ohne Fehler', async () =>
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+test('Wegwerf-Datenbank pro Deployment wird erkannt', async () => {
+  const { isDeploymentDatabase, databaseHost } = await import('../src/config.js');
+  const temp = 'libsql://dpl-2uwk1ewvge5hppc2ppwwav-vercel-icfg-6stjapdoxqvwtdnjrhetivjw.aws-us-east-1.turso.io';
+  assert.equal(isDeploymentDatabase(temp), true);
+  assert.equal(isDeploymentDatabase('libsql://database-arbeitsstunden-vercel-icfg-6stjapdoxqvwtdnjrhetivjw.aws-us-east-1.turso.io'), false);
+  assert.equal(isDeploymentDatabase('file:data/x.db'), false);
+  assert.equal(databaseHost(temp), 'dpl-2uwk1ewvge5hppc2ppwwav-vercel-icfg-6stjapdoxqvwtdnjrhetivjw.aws-us-east-1.turso.io');
+});

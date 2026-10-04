@@ -32,6 +32,10 @@ export function databaseOverview(env = process.env) {
   });
 }
 
+// Die Turso-Anbindung von Vercel kann für jedes Deployment eine eigene Kopie anlegen ("dpl-…").
+// Was dort gespeichert wird, ist nach dem nächsten Update weg.
+export const isDeploymentDatabase = (dbUrl) => /^dpl-/.test(databaseHost(dbUrl));
+
 // Servername der verwendeten Datenbank (ohne Zugangsdaten).
 export function databaseHost(dbUrl) {
   if (!dbUrl || dbUrl.startsWith('file:')) return 'lokale Datei';
