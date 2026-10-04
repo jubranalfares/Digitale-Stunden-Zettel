@@ -165,7 +165,8 @@ export class LazyDatabase {
   ready() {
     this.promise ??= openDatabase(this.config).catch((err) => {
       this.promise = null;
-      throw err;
+      // Markieren, damit die App eine verständliche Seite statt eines allgemeinen Fehlers zeigt.
+      throw Object.assign(err, { databaseUnavailable: true });
     });
     return this.promise;
   }

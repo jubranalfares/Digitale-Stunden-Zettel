@@ -250,3 +250,25 @@ test('Auf Vercel ohne Datenbank erscheint eine Anleitung', async () => {
     srv.close();
   }
 });
+
+test('Turso-Zugangsdaten werden auch mit Präfix erkannt', async () => {
+  const { loadConfig, databaseVariableNames } = await import('../src/config.js');
+  const prefixed = loadConfig({ VERCEL: '1', STORAGE_TURSO_DATABASE_URL: 'libsql://x.turso.io', STORAGE_TURSO_AUTH_TOKEN: 'abc' });
+  assert.equal(prefixed.dbUrl, 'libsql://x.turso.io');
+  assert.equal(prefixed.dbAuthToken, 'abc');
+  assert.equal(prefixed.dbMissing, false);
+  assert.equal(loadConfig({ VERCEL: '1' }).dbMissing, true);
+  assert.deepEqual(databaseVariableNames({ TURSO_AUTH_TOKEN: 'geheim', PATH: '/bin' }), ['TURSO_AUTH_TOKEN']);
+});
+
+test('Nicht erreichbare Datenbank zeigt eine verständliche Seite', async () => {
+  const srv = createApp({ config: { ...config, dbUrl: 'http://127.0.0.1:9', dbAuthToken: 'x' } }).listen(0);
+  await new Promise((r) => srv.once('listening', r));
+  try {
+    const res = await fetch(`http://127.0.0.1:${srv.address().port}/login`);
+    assert.equal(res.status, 503);
+    assert.match(await res.text(), /Datenbank nicht erreichbar/);
+  } finally {
+    srv.close();
+  }
+});

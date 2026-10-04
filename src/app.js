@@ -2,6 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { csrfProtection, requireLogin, sessionMiddleware } from './auth.js';
+import { databaseVariableNames } from './config.js';
 import { LazyDatabase } from './db.js';
 import { sendDataUrl } from './http.js';
 import { DATEV, ROSTER } from './layout.js';
@@ -61,7 +62,9 @@ export function createApp({ config, db = new LazyDatabase(config) }) {
 
   // Auf Vercel ohne verbundene Datenbank: Anleitung statt Fehlermeldung.
   if (config.dbMissing) {
-    app.use((req, res) => res.status(503).render('db-missing', { title: 'Datenbank verbinden' }));
+    app.use((req, res) => res.status(503).render('db-missing', {
+      title: 'Datenbank verbinden', found: databaseVariableNames(), problem: null,
+    }));
     return app;
   }
 
@@ -100,6 +103,11 @@ export function createApp({ config, db = new LazyDatabase(config) }) {
   // eslint-disable-next-line no-unused-vars
   app.use((err, req, res, next) => {
     console.error(err);
+    if (err.databaseUnavailable) {
+      return res.status(503).render('db-missing', {
+        title: 'Datenbank nicht erreichbar', found: databaseVariableNames(), problem: String(err.message).slice(0, 300),
+      });
+    }
     const tooLarge = err.type === 'entity.too.large';
     res.status(tooLarge ? 413 : 500).render('error', {
       title: tooLarge ? 'Datei zu groß' : 'Fehler',
