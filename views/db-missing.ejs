@@ -9,6 +9,9 @@
       <h1>Datenbank nicht erreichbar</h1>
       <p>Die Zugangsdaten sind eingetragen, aber die Verbindung klappt nicht. Meist passt der Token nicht – in Turso einen neuen Token erzeugen, in Vercel eintragen und neu deployen.</p>
       <div class="flash flash-error small">Fehlermeldung: <%= problem %></div>
+      <% if (locals.address) { %>
+        <p class="small">Verwendete Adresse<% if (locals.variable) { %> (aus <code><%= variable %></code>)<% } %>:<br><code style="overflow-wrap:anywhere"><%= address %></code></p>
+      <% } %>
     <% } else { %>
       <h1>Noch eine Datenbank verbinden</h1>
       <p>Die App läuft – sie braucht nur noch einen Ort, an dem die Stundenzettel dauerhaft gespeichert werden.

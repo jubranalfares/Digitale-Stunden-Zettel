@@ -1,6 +1,22 @@
 import path from 'node:path';
 
-const isDbUrl = (v) => /^(libsql|https?|wss?):\/\//.test(String(v ?? ''));
+// Beim Kopieren aufs Handy rutschen leicht Anführungszeichen, Leerzeichen, unsichtbare Zeichen oder gleich
+// "NAME=wert" mit in das Feld. Daher wird aus dem Eintrag nur die eigentliche Adresse bzw. der Schlüssel gelesen.
+const visible = (v) => String(v ?? '').replace(/[\u200B-\u200D\u2060\uFEFF]/g, '');
+
+export function cleanDbUrl(v) {
+  const m = /(?:libsql|https?|wss?):\/\/[^\s"'`<>,;]+/.exec(visible(v));
+  return m ? m[0] : '';
+}
+
+export function cleanToken(v) {
+  const s = visible(v);
+  const jwt = /eyJ[\w-]+\.[\w-]+\.[\w-]+/.exec(s);
+  if (jwt) return jwt[0];
+  return s.replace(/^[^=]*_TOKEN\s*=/, '').trim().replace(/^["'`]+|["'`]+$/g, '').trim();
+}
+
+const isDbUrl = (v) => !!cleanDbUrl(v);
 
 // Turso-Zugangsdaten finden – auch wenn Vercel sie mit einem Präfix anlegt (z. B. STORAGE_TURSO_DATABASE_URL).
 // Adresse und Schlüssel werden als Paar mit gleichem Präfix gesucht, damit nie zwei Datenbanken gemischt werden.
@@ -9,8 +25,8 @@ function findDatabase(env) {
   const urlKey = [/^TURSO_DATABASE_URL$/, /^LIBSQL_URL$/, /TURSO.*URL$/, /LIBSQL.*URL$/]
     .map((re) => keys.find((k) => re.test(k) && isDbUrl(env[k])))
     .find(Boolean)
-    ?? (isDbUrl(env.DATABASE_URL) && /^libsql:/.test(env.DATABASE_URL) ? 'DATABASE_URL' : null)
-    ?? keys.find((k) => /^libsql:\/\//.test(String(env[k] ?? '')));
+    ?? (/^libsql:/.test(cleanDbUrl(env.DATABASE_URL)) ? 'DATABASE_URL' : null)
+    ?? keys.find((k) => /^libsql:\/\//.test(cleanDbUrl(env[k])));
   if (!urlKey) return { url: '', token: undefined, variable: '' };
 
   const prefix = urlKey.replace(/(DATABASE_URL|URL)$/, '');
@@ -18,7 +34,7 @@ function findDatabase(env) {
     ?? [/^TURSO_AUTH_TOKEN$/, /^LIBSQL_AUTH_TOKEN$/, /TURSO.*TOKEN$/, /LIBSQL.*TOKEN$/]
       .map((re) => keys.find((k) => re.test(k) && env[k]))
       .find(Boolean);
-  return { url: env[urlKey], token: tokenKey ? env[tokenKey] : undefined, variable: urlKey };
+  return { url: cleanDbUrl(env[urlKey]), token: tokenKey ? cleanToken(env[tokenKey]) || undefined : undefined, variable: urlKey };
 }
 
 // Für die Fehlersuche: Datenbank-Variablen mit Namen und – bei Adressen – nur dem Servernamen. Nie Schlüssel.
@@ -26,7 +42,7 @@ export function databaseOverview(env = process.env) {
   return Object.keys(env).filter((k) => /TURSO|LIBSQL|DATABASE/.test(k)).sort().map((name) => {
     let host = '';
     if (isDbUrl(env[name])) {
-      try { host = new URL(env[name]).host; } catch { /* kein gültiger Wert */ }
+      try { host = new URL(cleanDbUrl(env[name])).host; } catch { host = '(ungültige Adresse)'; }
     }
     return { name, host };
   });

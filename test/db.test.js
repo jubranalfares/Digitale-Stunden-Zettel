@@ -54,3 +54,21 @@ test('Wegwerf-Datenbank pro Deployment wird erkannt', async () => {
   assert.equal(isDeploymentDatabase('file:data/x.db'), false);
   assert.equal(databaseHost(temp), 'dpl-2uwk1ewvge5hppc2ppwwav-vercel-icfg-6stjapdoxqvwtdnjrhetivjw.aws-us-east-1.turso.io');
 });
+
+test('Kopierfehler in den Vercel-Variablen werden bereinigt', async () => {
+  const { loadConfig } = await import('../src/config.js');
+  const host = 'libsql://database-arbeitsstunden-vercel-icfg-x.aws-us-east-1.turso.io';
+  const token = 'eyJhbGciOiJFZERTQSJ9.eyJhIjoicncifQ.abc-_DEF';
+  for (const [url, tok] of [
+    [`"${host}"`, `"${token}"`],
+    [` ${host}\n`, `${token} `],
+    [`TURSO_DATABASE_URL=${host}`, `TURSO_AUTH_TOKEN=${token}`],
+    [`${host}\nTURSO_AUTH_TOKEN=${token}`, token],
+    [`​${host} `, token],
+  ]) {
+    const c = loadConfig({ VERCEL: '1', STORAGE_TURSO_DATABASE_URL: 'libsql://dpl-x.turso.io', TURSO_DATABASE_URL: url, TURSO_AUTH_TOKEN: tok });
+    assert.equal(c.dbUrl, host);
+    assert.equal(c.dbAuthToken, token);
+    assert.equal(c.dbVariable, 'TURSO_DATABASE_URL');
+  }
+});

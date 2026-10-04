@@ -132,6 +132,7 @@ export function createApp({ config, db = new LazyDatabase(config) }) {
     if (err.databaseUnavailable) {
       return res.status(503).render('db-missing', {
         title: 'Datenbank nicht erreichbar', found: databaseVariableNames(), problem: String(err.message).slice(0, 300),
+        address: String(config.dbUrl ?? '').replace(/\?.*$/, ''), variable: config.dbVariable,
       });
     }
     const tooLarge = err.type === 'entity.too.large';
