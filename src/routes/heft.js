@@ -5,7 +5,7 @@ import { requireAdmin, requireLogin } from '../auth.js';
 import { canEdit, earliestEditableDate, saveEntry } from '../entries.js';
 import { currentMonthOf, sendPdf } from '../http.js';
 import { createPdf, drawEmployeeSheet, drawRoster, pdfToBuffer } from '../pdf.js';
-import { buildEmployeeSheet, buildRoster, rosterCell, rosterEmployerSignature } from '../sheets.js';
+import { buildEmployeeSheet, buildRoster, loadMonthSnapshot, rosterCell, rosterEmployerSignature } from '../sheets.js';
 import { InputError, isValidISODate, monthKey, monthLabel, monthOf, parseMonth } from '../time.js';
 
 export default function heftRoutes({ store }) {
@@ -132,9 +132,10 @@ export default function heftRoutes({ store }) {
   router.get('/pdf', requireLogin, requireAdmin, async (req, res) => {
     const ym = monthFrom(req);
     const doc = createPdf(`Stundenzettel ${monthLabel(ym)}`);
-    drawRoster(doc, await buildRoster(store, ym));
-    for (const u of await store.employeesForMonth(monthKey(ym))) {
-      if (u.entry_count > 0) drawEmployeeSheet(doc, await buildEmployeeSheet(store, u, ym));
+    const snapshot = await loadMonthSnapshot(store, monthKey(ym));
+    drawRoster(doc, await buildRoster(snapshot, ym, { onlyWithEntries: true }));
+    for (const u of await snapshot.employeesForMonth(monthKey(ym))) {
+      if (u.entry_count > 0) drawEmployeeSheet(doc, await buildEmployeeSheet(snapshot, u, ym));
     }
     sendPdf(res, await pdfToBuffer(doc), `Stundenzettel_${monthKey(ym)}.pdf`);
   });

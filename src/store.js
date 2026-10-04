@@ -11,27 +11,34 @@ const TABLES = ['settings', 'users', 'signatures', 'entries'];
 
 const SAVE_ENTRY_SQL = `
   INSERT INTO entries (user_id, work_date, start_time, end_time, break_minutes, work_minutes, code, remarks,
-                       recorded_on, recorded_by, signature_id)
+                       recorded_on, recorded_by, signature_id, employer_signature_id, updated_at)
   VALUES (@user_id, @work_date, @start_time, @end_time, @break_minutes, @work_minutes, @code, @remarks,
-          @recorded_on, @recorded_by, @signature_id)
+          @recorded_on, @recorded_by, @signature_id, @employer_signature_id, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
   ON CONFLICT (user_id, work_date) DO UPDATE SET
     start_time = excluded.start_time, end_time = excluded.end_time,
     break_minutes = excluded.break_minutes, work_minutes = excluded.work_minutes,
     code = excluded.code, remarks = excluded.remarks,
     recorded_on = excluded.recorded_on, recorded_by = excluded.recorded_by,
-    signature_id = excluded.signature_id, updated_at = CURRENT_TIMESTAMP`;
+    signature_id = excluded.signature_id, employer_signature_id = excluded.employer_signature_id,
+    updated_at = excluded.updated_at`;
 
 
 export class Store {
-  constructor(db) {
+  constructor(db, inTransaction = false) {
     this.db = db;
+    this.inTransaction = inTransaction;
+  }
+
+  atomic(fn, mode = 'write') {
+    if (this.inTransaction) return fn(this);
+    return this.db.transaction((db) => fn(new Store(db, true)), mode);
   }
 
   // ---- Einstellungen --------------------------------------------------------
 
   async getSettings() {
     const settings = { ...DEFAULT_SETTINGS };
-    for (const { key, value } of await this.db.all('SELECT key, value FROM settings')) settings[key] = value ?? '';
+    for (const { key, value } of await this.db.all("SELECT key, value FROM settings WHERE key NOT LIKE 'login:%'")) settings[key] = value ?? '';
     return settings;
   }
 
@@ -48,12 +55,21 @@ export class Store {
     return Number((await this.db.get('SELECT COUNT(*) AS n FROM users')).n);
   }
 
-  async createUser({ username, passwordHash, role, name, personnelNo = '', onRoster = true, mustChangePassword = false, isOwner = false }) {
+  async createUser({ username, passwordHash, role, name, onRoster = true, mustChangePassword = false, isOwner = false }) {
     const { lastId } = await this.db.run(`
-      INSERT INTO users (username, password_hash, role, name, personnel_no, on_roster, must_change_password, is_owner)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `, [username, passwordHash, role, name, personnelNo, onRoster ? 1 : 0, mustChangePassword ? 1 : 0, isOwner ? 1 : 0]);
+      INSERT INTO users (username, password_hash, role, name, on_roster, must_change_password, is_owner)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [username, passwordHash, role, name, onRoster ? 1 : 0, mustChangePassword ? 1 : 0, isOwner ? 1 : 0]);
     return lastId;
+  }
+
+  createInitialAdmin(company, user) {
+    return this.atomic(async (store) => {
+      if (await store.countUsers()) return null;
+      const id = await store.createUser(user);
+      await store.setSetting('company_name', company);
+      return id;
+    });
   }
 
   getUser(id) {
@@ -65,7 +81,7 @@ export class Store {
   }
 
   async updateUser(id, fields) {
-    const allowed = ['username', 'name', 'personnel_no', 'on_roster', 'active', 'role', 'password_hash', 'must_change_password', 'signature_id', 'is_owner'];
+    const allowed = ['username', 'name', 'on_roster', 'active', 'password_hash', 'must_change_password', 'signature_id', 'role', 'is_owner'];
     const keys = Object.keys(fields).filter((k) => allowed.includes(k));
     if (!keys.length) return;
     const args = Object.fromEntries(keys.map((k) => [k, fields[k]]));
@@ -134,23 +150,17 @@ export class Store {
   }
 
   async setUserSignature(userId, image) {
+    if (!this.inTransaction) return this.atomic((store) => store.setUserSignature(userId, image));
     const id = await this.addSignature('employee', userId, image);
     await this.updateUser(userId, { signature_id: id });
     return id;
   }
 
   async setEmployerSignature(userId, image) {
+    if (!this.inTransaction) return this.atomic((store) => store.setEmployerSignature(userId, image));
     const id = await this.addSignature('employer', userId, image);
     await this.setSetting('employer_signature_id', id);
     return id;
-  }
-
-  // Arbeitgeber-Unterschrift, die an einem Datum gültig war (sonst die älteste vorhandene).
-  async employerSignatureAt(isoDate) {
-    return await this.db.get(`
-      SELECT * FROM signatures WHERE kind = 'employer' AND created_at <= ? ORDER BY created_at DESC, id DESC LIMIT 1
-    `, [`${isoDate} 23:59:59`])
-      ?? this.db.get(`SELECT * FROM signatures WHERE kind = 'employer' ORDER BY created_at, id LIMIT 1`);
   }
 
   // ---- Einträge -------------------------------------------------------------
@@ -193,13 +203,13 @@ export class Store {
   // Sitzung samt Benutzer in einer Abfrage (spart online einen Datenbank-Aufruf pro Seite).
   async getSessionWithUser(idHash) {
     const row = await this.db.get(`
-      SELECT s.id_hash AS s_id_hash, s.csrf_token AS s_csrf_token, s.flash AS s_flash, s.expires_at AS s_expires_at, u.*
-      FROM sessions s JOIN users u ON u.id = s.user_id
+      SELECT s.id_hash AS s_id_hash, s.user_id AS s_user_id, s.csrf_token AS s_csrf_token, s.flash AS s_flash, s.expires_at AS s_expires_at, u.*
+      FROM sessions s LEFT JOIN users u ON u.id = s.user_id
       WHERE s.id_hash = ? AND s.expires_at > ?
     `, [idHash, Date.now()]);
     if (!row) return null;
-    const { s_id_hash: id_hash, s_csrf_token: csrf_token, s_flash: flash, s_expires_at: expires_at, ...user } = row;
-    return { session: { id_hash, csrf_token, flash, expires_at: Number(expires_at), user_id: user.id }, user };
+    const { s_id_hash: id_hash, s_user_id: user_id, s_csrf_token: csrf_token, s_flash: flash, s_expires_at: expires_at, ...user } = row;
+    return { session: { id_hash, csrf_token, flash, expires_at: Number(expires_at), user_id }, user: user.id ? user : null };
   }
 
   async touchSession(idHash, expiresAt) {
@@ -222,6 +232,7 @@ export class Store {
 
   // SQL-Datei mit allen Daten; einspielbar mit `sqlite3 neu.db < datei.sql` bzw. `turso db shell … < datei.sql`.
   async dumpSql() {
+    if (!this.inTransaction) return this.atomic((store) => store.dumpSql(), 'read');
     const quote = (v) => {
       if (v == null) return 'NULL';
       if (typeof v === 'number' || typeof v === 'bigint') return String(v);
@@ -229,12 +240,13 @@ export class Store {
     };
     const lines = ['-- Datensicherung Digitale Stundenzettel', 'BEGIN TRANSACTION;'];
     const schema = await this.db.all(`
-      SELECT sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' AND name != 'sessions'
+      SELECT sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%'
+        AND (name IN ('settings','users','signatures','entries','sessions','schema_version') OR tbl_name = 'entries')
       ORDER BY type = 'index', name
     `);
     for (const { sql } of schema) lines.push(`${sql.replace(/^CREATE (TABLE|INDEX) (?!IF NOT EXISTS)/, 'CREATE $1 IF NOT EXISTS ')};`);
     for (const table of [...TABLES, 'schema_version']) {
-      for (const row of await this.db.all(`SELECT * FROM ${table}`)) {
+      for (const row of await this.db.all(`SELECT * FROM ${table}${table === 'settings' ? " WHERE key NOT LIKE 'login:%'" : ''}`)) {
         const cols = Object.keys(row);
         lines.push(`INSERT OR REPLACE INTO ${table} (${cols.join(', ')}) VALUES (${cols.map((c) => quote(row[c])).join(', ')});`);
       }

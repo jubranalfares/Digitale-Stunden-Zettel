@@ -2,12 +2,13 @@
 <div class="auth-wrap">
   <div class="card auth-card">
     <div class="auth-brand">
-      <span class="brand-mark" aria-hidden="true">⏱</span>
+      <img class="brand-mark" src="/static/icon.svg" alt="" width="34" height="34">
       <div><strong>Digitale Stundenzettel</strong><span><%= settings.company_name %></span></div>
     </div>
     <h1>Anmelden</h1>
     <% if (error) { %><div class="flash flash-error" role="alert"><%= error %></div><% } %>
     <form method="post" action="/login" class="stack">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <label>Benutzername
         <input name="benutzername" value="<%= username %>" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required autofocus>
       </label>

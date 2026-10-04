@@ -1,4 +1,6 @@
 // Gemeinsame Helfer für die Routen.
+import { PNG } from 'pngjs';
+import jpeg from 'jpeg-js';
 export function currentMonthOf(today) {
   const [year, month] = today.split('-').map(Number);
   return { year, month };
@@ -33,6 +35,23 @@ export function validImageDataUrl(value, { types = ['png'], maxBytes = 512 * 102
   const isPng = bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
   const isJpeg = bytes[0] === 0xff && bytes[1] === 0xd8;
   if ((m[1] === 'png' && !isPng) || (m[1] === 'jpeg' && !isJpeg)) return null;
+  try {
+    if (isPng) {
+      const width = bytes.readUInt32BE(16);
+      const height = bytes.readUInt32BE(20);
+      if (!width || !height || width > 2000 || height > 2000 || width * height > 2_000_000) return null;
+      const decoded = PNG.sync.read(bytes, { checkCRC: true });
+      if (types.length === 1) {
+        let ink = 0;
+        for (let i = 0; i < decoded.data.length; i += 4) {
+          if (decoded.data[i + 3] > 16 && decoded.data[i] + decoded.data[i + 1] + decoded.data[i + 2] < 720) ink++;
+        }
+        if (ink < 12) return null;
+      }
+    } else {
+      jpeg.decode(bytes, { maxResolutionInMP: 2, maxMemoryUsageInMB: 32 });
+    }
+  } catch { return null; }
   return `data:image/${m[1]};base64,${bytes.toString('base64')}`;
 }
 

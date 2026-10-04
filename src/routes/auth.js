@@ -6,7 +6,8 @@ import { validImageDataUrl } from '../http.js';
 
 export default function authRoutes({ store, config }) {
   const router = express.Router();
-  const throttle = new LoginThrottle();
+  const throttle = new LoginThrottle({ store });
+  const dummyHash = hashPassword('unused-login-timing-value');
 
   router.get('/', async (req, res) => {
     if (!await store.countUsers()) return res.redirect('/setup');
@@ -24,8 +25,8 @@ export default function authRoutes({ store, config }) {
   router.post('/setup', async (req, res) => {
     if (await store.countUsers()) return res.redirect('/login');
     const values = {
-      company: String(req.body.firma ?? '').trim(),
-      name: String(req.body.name ?? '').trim(),
+      company: String(req.body.firma ?? '').trim().slice(0, 80),
+      name: String(req.body.name ?? '').trim().slice(0, 80),
       username: String(req.body.benutzername ?? '').trim(),
     };
     const password = String(req.body.passwort ?? '');
@@ -36,12 +37,11 @@ export default function authRoutes({ store, config }) {
     else error = passwordProblem(password);
     if (error) return res.status(400).render('setup', { title: 'Ersteinrichtung', values, error });
 
-    await store.setSetting('company_name', values.company);
-    // Der erste Zugang ist der Inhaber (Betreiber): darf später Chef-Zugänge anlegen und Rollen verteilen.
-    const id = await store.createUser({
+    const id = await store.createInitialAdmin(values.company, {
       username: values.username, passwordHash: await hashPassword(password), role: 'admin', name: values.name,
       onRoster: false, isOwner: true,
     });
+    if (!id) return res.status(409).render('error', { title: 'Bereits eingerichtet', message: 'Der Betrieb wurde bereits eingerichtet. Bitte anmelden.' });
     await startSession(req, res, store, config, id);
     res.redirect('/einstellungen?willkommen=1#unterschrift');
   });
@@ -61,16 +61,18 @@ export default function authRoutes({ store, config }) {
   router.post('/login', async (req, res) => {
     const username = String(req.body.benutzername ?? '').trim();
     const password = String(req.body.passwort ?? '');
-    const key = `${req.ip}|${username.toLowerCase()}`;
+    const key = `user:${username.toLowerCase()}`;
+    const keys = [key, `ip:${req.ip}`];
 
-    if (throttle.isBlocked(key)) return renderLogin(res, { username, error: 'Zu viele Fehlversuche. Bitte warten Sie 5 Minuten.', status: 429 });
+    if (await throttle.isBlocked(keys)) return renderLogin(res, { username, error: 'Zu viele Fehlversuche. Bitte warten Sie 5 Minuten.', status: 429 });
     const user = await store.getUserByUsername(username);
-    const ok = user && user.active && await verifyPassword(password, user.password_hash);
+    const valid = password.length <= 256 && await verifyPassword(password, user?.password_hash ?? await dummyHash);
+    const ok = user && user.active && valid;
     if (!ok) {
-      throttle.fail(key);
+      await throttle.fail(keys);
       return renderLogin(res, { username, error: 'Benutzername oder Passwort ist falsch.', status: 401 });
     }
-    throttle.reset(key);
+    await throttle.reset(key);
     await startSession(req, res, store, config, user.id);
     res.redirect('/');
   });
@@ -102,9 +104,15 @@ export default function authRoutes({ store, config }) {
     const employerSignature = asksEmployerSignature(req, res);
     if (error) return res.status(400).render('welcome', { title: 'Willkommen', error, employerSignature });
 
-    if (signature && isEmployee) await store.setUserSignature(req.user.id, signature);
-    if (signature && employerSignature) await store.setEmployerSignature(req.user.id, signature);
-    await store.updateUser(req.user.id, { password_hash: await hashPassword(password), must_change_password: 0 });
+    if (await verifyPassword(password, req.user.password_hash)) {
+      return res.status(400).render('welcome', { title: 'Willkommen', error: 'Bitte ein anderes Passwort als das Startpasswort wählen.', employerSignature });
+    }
+    const passwordHash = await hashPassword(password);
+    await store.atomic(async (tx) => {
+      if (signature && isEmployee) await tx.setUserSignature(req.user.id, signature);
+      if (signature && employerSignature) await tx.setEmployerSignature(req.user.id, signature);
+      await tx.updateUser(req.user.id, { password_hash: passwordHash, must_change_password: 0 });
+    });
     await store.deleteUserSessions(req.user.id, req.session.id_hash);
     await req.flash('success', isEmployee || signature
       ? 'Alles eingerichtet! Ihre Unterschrift wird ab jetzt automatisch gesetzt.'

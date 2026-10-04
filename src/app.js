@@ -24,7 +24,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // aus dem Zwischenspeicher nehmen.
 const ASSET_VERSION = (() => {
   const hash = crypto.createHash('sha256');
-  for (const file of ['css/app.css', 'js/app.js', 'js/theme.js']) hash.update(fs.readFileSync(path.join(ROOT, 'public', file)));
+  for (const file of ['css/app.css', 'js/app.js', 'js/theme.js', 'js/time-input.js']) hash.update(fs.readFileSync(path.join(ROOT, 'public', file)));
   return hash.digest('hex').slice(0, 10);
 })();
 
@@ -58,15 +58,18 @@ export function createApp({ config, db = new LazyDatabase(config) }) {
     });
     next();
   });
-  app.use('/static', express.static(path.join(ROOT, 'public'), { maxAge: '1d' }));
+  app.use('/static', express.static(path.join(ROOT, 'public'), {
+    maxAge: '1d',
+    // Auch Modulimporte wie time-input.js nach einem Update neu validieren.
+    setHeaders: (res, file) => { if (file.endsWith('.js')) res.set('Cache-Control', 'public, max-age=0, must-revalidate'); },
+  }));
   app.use('/fonts', express.static(path.join(ROOT, 'assets', 'fonts'), { maxAge: '30d' }));
   app.get('/healthz', (req, res) => res.type('text').send('ok'));
 
   // Standardwerte für alle Seiten (auch Fehlerseiten, die vor der Sitzungsprüfung entstehen).
   app.use((req, res, next) => {
-    // Seiten enthalten persönliche Daten und sollen nach jedem Update sofort aktuell sein.
-    res.set('Cache-Control', 'no-store');
     req.today = todayISO(config.timeZone);
+    res.set('Cache-Control', 'private, no-store');
     Object.assign(res.locals, {
       today: req.today, settings: { ...DEFAULT_SETTINGS }, currentPath: req.path, title: '',
       user: null, flash: null, csrfToken: '',
@@ -102,7 +105,7 @@ export function createApp({ config, db = new LazyDatabase(config) }) {
     const signature = await store.getSignature(Number(req.params.id));
     const allowed = signature && (req.user.role === 'admin' || signature.kind === 'employer' || signature.user_id === req.user.id);
     if (!allowed) return res.status(404).end();
-    sendDataUrl(res, signature.image, 'private, max-age=31536000, immutable');
+    sendDataUrl(res, signature.image, 'private, no-store');
   });
 
   app.get('/logo', requireLogin, (req, res) => {

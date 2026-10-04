@@ -16,37 +16,10 @@ export const MONTH_NAMES = [
 
 export const WEEKDAYS_SHORT = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 
-// Fehler mit einer Meldung, die direkt dem Benutzer angezeigt werden darf.
-export class InputError extends Error {}
+import { InputError } from '../public/js/time-input.js';
+export { InputError, parseClock, parseDuration, parseRosterInput } from '../public/js/time-input.js';
 
 const pad = (n) => String(n).padStart(2, '0');
-
-// Uhrzeit wie auf Papier: "12", "9", "930", "1230", "12:30", "12.30"
-export function parseClock(value, label = 'Uhrzeit') {
-  const s = String(value ?? '').trim();
-  if (!s) return null;
-  const m = /^(\d{1,2})(?:[:.,]?(\d{2}))?$/.exec(s);
-  if (!m) throw new InputError(`${label} „${s}“ ist ungültig (Format HH:MM).`);
-  const h = Number(m[1]);
-  const min = Number(m[2] ?? 0);
-  if (h > 23 || min > 59) throw new InputError(`${label} „${s}“ ist ungültig.`);
-  return h * 60 + min;
-}
-
-// Pause: "0:30", "30" oder "45" (Minuten), "1" (Stunden), "130" (1:30), "0,5" (Stunden).
-export function parseDuration(value) {
-  const s = String(value ?? '').trim();
-  if (!s) return 0;
-  let m = /^(\d{1,2})[:.](\d{2})$/.exec(s);
-  if (m && Number(m[2]) < 60) return Number(m[1]) * 60 + Number(m[2]);
-  if (/^\d$/.test(s)) return Number(s) * 60;
-  if (/^\d{2}$/.test(s)) return Number(s);
-  m = /^(\d{1,2})(\d{2})$/.exec(s);
-  if (m && Number(m[2]) < 60) return Number(m[1]) * 60 + Number(m[2]);
-  m = /^(\d{1,2})[,.](\d{1,2})$/.exec(s);
-  if (m) return Math.round(Number(`${m[1]}.${m[2]}`) * 60);
-  throw new InputError(`Pause „${s}“ ist ungültig (z. B. 0:30).`);
-}
 
 export function formatClock(minutes) {
   if (minutes == null) return '';
@@ -66,6 +39,10 @@ export function formatDecimalHours(minutes) {
 
 // Arbeitszeit = Ende − Beginn − Pause. Ende vor Beginn bedeutet Schicht über Mitternacht.
 export function computeWorkMinutes(start, end, breakMinutes) {
+  if (![start, end, breakMinutes].every(Number.isInteger)
+      || start < 0 || start >= 1440 || end < 0 || end >= 1440 || breakMinutes < 0) {
+    throw new InputError('Ungültige Zeitwerte.');
+  }
   let gross = end - start;
   if (gross === 0) throw new InputError('Beginn und Ende dürfen nicht gleich sein.');
   if (gross < 0) gross += 24 * 60;

@@ -1,7 +1,7 @@
 // Speichern von Tageseinträgen inkl. Berechtigung und automatischer Unterschrift.
 import {
   CODES, InputError, computeWorkMinutes, formatClock, formatDuration, isValidISODate, monthKey, parseClock,
-  parseDuration, shiftMonth,
+  parseDuration, parseRosterInput, shiftMonth,
 } from './time.js';
 
 // Frühestes Datum, das ein Mitarbeiter noch bearbeiten darf (Anfang des Vormonats). Der Chef darf alles.
@@ -22,6 +22,21 @@ const sameEntry = (a, b) => ['start_time', 'end_time', 'break_minutes', 'code', 
 // (z. B. bleibt die Pause erhalten, wenn auf der Einsatzliste nur "12-16" eingetragen wird).
 // Sind alle Felder leer, wird der Tag gelöscht.
 export async function saveEntry(store, { actor, employee, input, today }) {
+  if (!store.inTransaction) {
+    return store.atomic(async (tx) => saveEntry(tx, {
+      actor: await tx.getUser(actor.id), employee: await tx.getUser(employee.id), input, today,
+    }));
+  }
+  if (!actor?.active || !employee || employee.role !== 'employee'
+      || (actor.role !== 'admin' && (actor.id !== employee.id || !employee.active))) {
+    throw new InputError('Keine Berechtigung für diesen Mitarbeiter.');
+  }
+  if (actor.must_change_password) throw new InputError('Bitte zuerst die Ersteinrichtung abschließen.');
+  const selfService = actor.role === 'employee' && actor.id === employee.id;
+  if (selfService && !employee.signature_id) {
+    throw new InputError('Bitte zuerst unter „Einstellungen“ unterschreiben.');
+  }
+  if (Object.hasOwn(input, 'einsatz')) input = { user: input.user, datum: input.datum, ...parseRosterInput(input.einsatz) };
   const date = String(input.datum ?? '').trim();
   if (!isValidISODate(date)) throw new InputError('Ungültiges Datum.');
   if (date > today) throw new InputError('Dieser Tag liegt in der Zukunft.');
@@ -37,16 +52,13 @@ export async function saveEntry(store, { actor, employee, input, today }) {
   const end = parseClock(field('ende', formatClock(previous?.end_time)), 'Ende');
   let breakMinutes = parseDuration(field('pause', previous?.break_minutes ? formatDuration(previous.break_minutes) : ''));
 
-  if (start == null && end == null && !code && !remarks) {
+  if (start == null && end == null && !code && !remarks && breakMinutes === 0) {
     if (previous) await store.deleteEntry(employee.id, date);
     return { deleted: !!previous };
   }
   if ((start == null) !== (end == null)) throw new InputError(start == null ? 'Beginn fehlt.' : 'Ende fehlt.');
 
-  const selfService = actor.id === employee.id;
-  if (selfService && !employee.signature_id) {
-    throw new InputError('Bitte zuerst unter „Einstellungen“ unterschreiben – danach wird die Unterschrift automatisch gesetzt.');
-  }
+  if (start == null && !code) throw new InputError('Beginn und Ende oder ein Kürzel fehlen noch.');
 
   let workMinutes = 0;
   if (start != null) workMinutes = computeWorkMinutes(start, end, breakMinutes);
@@ -64,8 +76,11 @@ export async function saveEntry(store, { actor, employee, input, today }) {
     recorded_on: today,
     recorded_by: actor.id,
     // Die hinterlegte Unterschrift wird nur gesetzt, wenn der Mitarbeiter selbst einträgt.
-    signature_id: selfService ? employee.signature_id : null,
+    signature_id: selfService ? (previous?.signature_id ?? employee.signature_id) : null,
+    // Feste Version pro Tag: ein späteres Neuzeichnen ändert keinen alten Eintrag.
+    employer_signature_id: previous ? previous.employer_signature_id : Number((await store.getSettings()).employer_signature_id) || null,
   };
-  if (!previous || !sameEntry(previous, entry)) await store.saveEntry(entry);
+  // Auch unveränderte, ausdrücklich gespeicherte Eingaben erhalten das aktuelle Aufzeichnungsdatum.
+  if (!previous || !sameEntry(previous, entry) || previous.recorded_on !== today) await store.saveEntry(entry);
   return { entry };
 }

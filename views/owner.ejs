@@ -41,13 +41,13 @@
             <form method="post" action="/inhaber/benutzer/<%= u.id %>/rolle">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
               <input type="hidden" name="rolle" value="<%= u.role === 'admin' ? 'employee' : 'admin' %>">
-              <button class="btn btn-small" type="submit" data-confirm="<%= u.role === 'admin' ? u.name + ' zum Mitarbeiter machen? Der Chef-Zugang entfällt dann.' : u.name + ' zum Chef machen? Diese Person sieht dann alle Stundenzettel.' %>"><%= u.role === 'admin' ? 'Zum Mitarbeiter' : 'Zum Chef' %></button>
+              <button class="btn btn-small" type="submit"><%= u.role === 'admin' ? 'Zum Mitarbeiter' : 'Zum Chef' %></button>
             </form>
           <% } %>
           <% if (u.role === 'admin' && !self) { %>
             <form method="post" action="/inhaber/benutzer/<%= u.id %>/inhaber">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-              <button class="btn btn-small" type="submit" data-confirm="<%= u.is_owner ? 'Inhaber-Recht von ' + u.name + ' entziehen?' : u.name + ' zum Inhaber machen? Diese Person kann dann ebenfalls Chef-Zugänge verwalten.' %>"><%= u.is_owner ? 'Inhaber-Recht entziehen' : 'Zum Inhaber' %></button>
+              <button class="btn btn-small" type="submit"><%= u.is_owner ? 'Inhaber-Recht entziehen' : 'Zum Inhaber' %></button>
             </form>
           <% } %>
           <% if (!self) { %>
@@ -59,12 +59,14 @@
             <form method="post" action="/inhaber/benutzer/<%= u.id %>/passwort">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
               <input type="hidden" name="passwort" value="<%= suggestedPassword %>">
-              <button class="btn btn-small" type="submit" data-confirm="Neues Startpasswort für <%= u.name %> setzen?">Passwort neu</button>
+              <button class="btn btn-small" type="submit">Passwort neu</button>
             </form>
+            <% if (u.role === 'admin') { %>
             <form method="post" action="/inhaber/benutzer/<%= u.id %>/loeschen">
               <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-              <button class="btn btn-small btn-danger" type="submit" data-confirm="<%= u.name %> wirklich entfernen? (Wer schon Einträge im Heft hat, wird nur deaktiviert.)">Entfernen</button>
+              <button class="btn btn-small btn-danger" type="submit">Entfernen</button>
             </form>
+            <% } %>
           <% } %>
         </div>
       </li>

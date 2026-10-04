@@ -2,13 +2,14 @@
 <div class="auth-wrap">
   <div class="card auth-card wide">
     <div class="auth-brand">
-      <span class="brand-mark" aria-hidden="true">⏱</span>
+      <img class="brand-mark" src="/static/icon.svg" alt="" width="34" height="34">
       <div><strong>Digitale Stundenzettel</strong><span>Ersteinrichtung</span></div>
     </div>
     <h1>Willkommen! Zuerst den Inhaber-Zugang anlegen</h1>
     <p class="muted">Wer die Einrichtung macht, wird <strong>Inhaber</strong> (Betreiber der App): sieht alle Stundenzettel, legt danach unter „Inhaber“ die Chef-Zugänge und unter „Mitarbeiter“ die Mitarbeiter an und exportiert die PDFs für den Steuerberater.</p>
     <% if (error) { %><div class="flash flash-error" role="alert"><%= error %></div><% } %>
     <form method="post" action="/setup" class="form-grid">
+      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <label class="full">Name des Betriebs <span class="hint">(erscheint als „Firma“ auf den Formularen)</span>
         <input name="firma" value="<%= values.company || '' %>" placeholder="z. B. Eiscafé Taormina" required>
       </label>

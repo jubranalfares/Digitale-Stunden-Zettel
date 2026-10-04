@@ -101,7 +101,7 @@ export async function startHranaMock() {
         }
       });
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ baton: null, base_url: null, results }));
+      res.end(JSON.stringify({ baton: reqs.some((r) => r.type === 'close') ? null : 'test-baton', base_url: null, results }));
     });
   });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));

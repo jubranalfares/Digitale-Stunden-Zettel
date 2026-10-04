@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { after, before, test } from 'node:test';
-import { signaturePng } from '../scripts/demo.js';
+import { signaturePng } from './helpers/signature.js';
 import { createApp } from '../src/app.js';
 import { openDatabase } from '../src/db.js';
 import { Store } from '../src/store.js';
@@ -79,6 +79,7 @@ const day = (iso) => ({ datum: iso, beginn: '', pause: '', ende: '', kuerzel: ''
 
 test('Ersteinrichtung legt den Chef an', async () => {
   assert.equal((await chef.get('/')).location, '/setup');
+  await chef.get('/setup');
   const res = await chef.post('/setup', {
     firma: 'Eiscafé Taormina', name: 'Chef', benutzername: 'chef', passwort: 'geheim123', passwort2: 'geheim123',
   });
@@ -101,6 +102,7 @@ test('Chef unterschreibt einmal und legt eine Mitarbeiterin an', async () => {
 });
 
 test('Erste Anmeldung: eigenes Passwort und Unterschrift', async () => {
+  await anna.get('/login');
   assert.equal((await anna.post('/login', { benutzername: 'anna', passwort: 'start1234' })).location, '/');
   assert.equal((await anna.get('/zettel')).location, '/willkommen');
   await anna.get('/willkommen');
@@ -263,6 +265,7 @@ test('Inhaber legt einen zweiten Chef an', async () => {
   assert.equal(user.on_roster, 0);
   assert.equal(user.must_change_password, 1);
 
+  await marco.get('/login');
   assert.equal((await marco.post('/login', { benutzername: 'marco', passwort: 'chef23456' })).location, '/');
   const welcome = await marco.get('/willkommen');
   assert.doesNotMatch(welcome.data, /data-sigpad/, 'Arbeitgeber-Unterschrift gibt es schon');
@@ -331,12 +334,14 @@ test('Inhaber setzt Passwörter zurück, deaktiviert und entfernt Zugänge', asy
   let page = await chef.follow(`/inhaber/benutzer/${m.id}/passwort`, { passwort: 'neu-start1' });
   assert.match(page.data, /Neues Startpasswort für Marco Rossi/);
   assert.equal((await marco.get('/einsatzliste')).location, '/login', 'alte Sitzung beendet');
+  await marco.get('/login');
   assert.equal((await marco.post('/login', { benutzername: 'marco', passwort: 'neu-start1' })).location, '/');
   assert.equal((await marco.get('/einsatzliste')).location, '/willkommen');
 
   page = await chef.follow(`/inhaber/benutzer/${m.id}/aktiv`, { aktiv: '' });
   assert.match(page.data, /Marco Rossi ist jetzt deaktiviert/);
   assert.equal((await marco.get('/einsatzliste')).location, '/login');
+  await marco.get('/login');
   assert.equal((await marco.post('/login', { benutzername: 'marco', passwort: 'neu-start1' })).status, 401);
 
   // Ohne Einträge im Heft: wirklich weg. Mit Einträgen: nur deaktiviert (Aufbewahrungspflicht).
@@ -347,7 +352,7 @@ test('Inhaber setzt Passwörter zurück, deaktiviert und entfernt Zugänge', asy
   const a = await store.getUserByUsername('anna');
   const signatures = (await db.all('SELECT COUNT(*) AS n FROM signatures')).at(0).n;
   page = await chef.follow(`/inhaber/benutzer/${a.id}/loeschen`, {});
-  assert.match(page.data, /nur deaktiviert/);
+  assert.match(page.data, /wurde deaktiviert/);
   assert.equal((await store.getUser(a.id)).active, 0);
   assert.equal((await db.all('SELECT COUNT(*) AS n FROM signatures')).at(0).n, signatures);
   await chef.follow(`/inhaber/benutzer/${a.id}/aktiv`, { aktiv: '1' });
@@ -370,7 +375,7 @@ test('Der letzte Inhaber und der letzte Chef bleiben bestehen', async () => {
 
 test('Updates kommen sofort an: Seiten nicht zwischengespeichert, Stil mit Versionskennung', async () => {
   const page = await fetch(`${base}/login`);
-  assert.equal(page.headers.get('cache-control'), 'no-store');
+  assert.match(page.headers.get('cache-control'), /no-store/);
   const html = await page.text();
   const css = /href="(\/static\/css\/app\.css\?v=[0-9a-f]{10})"/.exec(html);
   assert.ok(css, 'Stil mit ?v=');
@@ -382,7 +387,9 @@ test('Updates kommen sofort an: Seiten nicht zwischengespeichert, Stil mit Versi
 });
 
 test('Falsches Passwort wird abgelehnt', async () => {
-  const res = await new Client().post('/login', { benutzername: 'anna', passwort: 'falsch' });
+  const client = new Client();
+  await client.get('/login');
+  const res = await client.post('/login', { benutzername: 'anna', passwort: 'falsch' });
   assert.equal(res.status, 401);
 });
 

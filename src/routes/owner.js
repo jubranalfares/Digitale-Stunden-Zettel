@@ -27,7 +27,7 @@ export default function ownerRoutes({ store }) {
 
   // Neuen Chef-Zugang anlegen
   router.post('/inhaber/chef', async (req, res) => {
-    const name = String(req.body.name ?? '').trim();
+    const name = String(req.body.name ?? '').trim().slice(0, 80);
     const username = String(req.body.benutzername ?? '').trim();
     const password = String(req.body.passwort ?? '');
     let error = null;
@@ -141,10 +141,10 @@ export default function ownerRoutes({ store }) {
       await req.flash('error', 'Es muss mindestens ein aktiver Chef bestehen bleiben.');
       return back(res);
     }
-    if (await store.userHasRecords(req.target.id)) {
+    if (req.target.role === 'employee' || await store.userHasRecords(req.target.id)) {
       await store.updateUser(req.target.id, { active: 0 });
       await store.deleteUserSessions(req.target.id);
-      await req.flash('info', `${req.target.name} hat bereits Einträge bzw. Unterschriften im Heft und wurde deshalb nur deaktiviert (Aufbewahrungspflicht).`);
+      await req.flash('info', `${req.target.name} wurde deaktiviert. Mitarbeiterdaten und vorhandene Aufzeichnungen bleiben erhalten (Aufbewahrungspflicht).`);
       return back(res);
     }
     await store.deleteUser(req.target.id);

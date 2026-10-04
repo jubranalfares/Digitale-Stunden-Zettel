@@ -3,7 +3,7 @@
   <div class="heft-top">
     <%- include('partials/month-nav', { navBase, ym, isCurrentMonth }) %>
     <% if (isAdmin) { %>
-      <a class="btn btn-primary" href="/pdf?monat=<%= monthKey(ym) %>" target="_blank" rel="noopener">PDF für Steuerberater</a>
+      <a class="btn btn-primary" href="/pdf?monat=<%= monthKey(ym) %>" data-pdf download>PDF für Steuerberater</a>
     <% } %>
   </div>
 
@@ -41,7 +41,8 @@
       </div>
     <% }) %>
     <p class="heft-hint">
-      <%= isAdmin ? 'In jede Spalte' : 'In Ihrer Spalte' %> einfach <strong>12-16</strong> eintragen – das System macht daraus 4:00 Std. und setzt die Unterschrift.
+      <%= isAdmin ? 'In jede Spalte' : 'In Ihrer Spalte' %> einfach <strong>12-16</strong> eintragen – ergibt ohne Pause 4:00 Std.<%= isAdmin ? ' Ihre Einträge werden mit AG markiert.' : ' Ihre Unterschrift erscheint automatisch.' %>
+      Eine vorhandene Pause wird abgezogen.
       Auch <strong>U</strong> (Urlaub), <strong>K</strong> (Krank), <strong>F</strong> (Feiertag) usw. sind möglich. Feld leeren = Eintrag löschen.
     </p>
   <% } %>

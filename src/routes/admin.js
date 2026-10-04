@@ -22,9 +22,8 @@ export default function adminRoutes({ store }) {
   // ---- Mitarbeiterverwaltung (nur Mitarbeiter; Chef-Zugänge verwaltet der Inhaber) ----
 
   const readUserForm = (body) => ({
-    name: String(body.name ?? '').trim(),
+    name: String(body.name ?? '').trim().slice(0, 80),
     username: String(body.benutzername ?? '').trim(),
-    on_roster: body.einsatzliste ? 1 : 0,
   });
 
   const userFormProblem = async (values, excludeId = null) => {
