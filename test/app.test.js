@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { after, before, test } from 'node:test';
@@ -408,6 +409,38 @@ test('Updates kommen sofort an: Seiten nicht zwischengespeichert, Stil mit Versi
   const asset = await fetch(base + css[1]);
   assert.equal(asset.status, 200);
   assert.match(asset.headers.get('cache-control'), /max-age=\d+/);
+});
+
+test('Inhaber sieht, wo die Daten liegen', async () => {
+  const page = await chef.get('/inhaber');
+  assert.match(page.data, /id="system"/);
+  assert.match(page.data, /lokale Datei/);
+  assert.match(page.data, /\d+ Zugänge · \d+ Tageseinträge/);
+});
+
+test('Update-eigene Vercel-Adressen leiten auf die feste Adresse um', async () => {
+  const srv = createApp({ db, config: { ...config, productionHost: 'stundenzettel.vercel.app' } }).listen(0);
+  await new Promise((r) => srv.once('listening', r));
+  // Die Host-Kopfzeile lässt sich mit fetch nicht setzen, daher node:http.
+  const call = (host, path, method = 'GET') => new Promise((resolve, reject) => {
+    const req = http.request({ port: srv.address().port, path, method, headers: { host } }, (r) => {
+      r.resume();
+      resolve({ status: r.statusCode, location: r.headers.location });
+    });
+    req.on('error', reject);
+    req.end();
+  });
+  try {
+    const old = await call('stundenzettel-abc123-jubran.vercel.app', '/zettel?monat=2026-10');
+    assert.equal(old.status, 302);
+    assert.equal(old.location, 'https://stundenzettel.vercel.app/zettel?monat=2026-10');
+    assert.equal((await call('stundenzettel.vercel.app', '/login')).status, 200);
+    assert.equal((await call('stundenzettel.example.de', '/login')).status, 200, 'eigene Domain bleibt');
+    assert.notEqual((await call('stundenzettel-abc123-jubran.vercel.app', '/login', 'POST')).status, 302);
+    assert.equal((await call('stundenzettel-abc123-jubran.vercel.app', '/healthz')).status, 200);
+  } finally {
+    srv.close();
+  }
 });
 
 test('Falsches Passwort wird abgelehnt', async () => {

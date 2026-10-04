@@ -72,4 +72,15 @@
   </ul>
   <p class="muted small" style="margin-top:12px">Beim Anlegen und beim Zurücksetzen wird dieses Startpasswort verwendet: <code><%= suggestedPassword %></code>. Notieren und weitergeben; beim nächsten Seitenaufruf wird ein neues vorgeschlagen.</p>
 </div>
+
+<div class="card" id="system">
+  <h2>System</h2>
+  <p class="muted small">Alle Daten liegen in der Online-Datenbank. Updates der App ändern daran nichts – diese Angaben bleiben nach jedem Update gleich (bis auf die Version).</p>
+  <dl class="facts">
+    <dt>Datenbank</dt><dd><code><%= system.database %></code><% if (system.variable) { %> <span class="muted small">(<%= system.variable %>)</span><% } %></dd>
+    <dt>Gespeichert</dt><dd><%= system.users %> Zugänge · <%= system.entries %> Tageseinträge<% if (system.lastEntry) { %> · letzter Tag <%= formatDateDE(system.lastEntry) %><% } %></dd>
+    <% if (system.productionHost) { %><dt>Feste Adresse</dt><dd><a href="https://<%= system.productionHost %>">https://<%= system.productionHost %></a></dd><% } %>
+    <% if (system.version) { %><dt>Version</dt><dd><code><%= system.version %></code></dd><% } %>
+  </dl>
+</div>
 <%- include('partials/footer') %>

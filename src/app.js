@@ -50,6 +50,16 @@ export function createApp({ config, db = new LazyDatabase(config) }) {
     json: (value) => JSON.stringify(value).replace(/</g, '\\u003c'),
   });
 
+  // Alte bzw. update-eigene Vercel-Adressen auf die feste Hauptadresse umleiten – nur dort bleibt man angemeldet.
+  if (config.productionHost) {
+    app.use((req, res, next) => {
+      const host = String(req.hostname ?? '').toLowerCase();
+      const otherVercelHost = host.endsWith('.vercel.app') && host !== config.productionHost;
+      if (!otherVercelHost || !['GET', 'HEAD'].includes(req.method) || req.path === '/healthz') return next();
+      res.redirect(302, `https://${config.productionHost}${req.originalUrl}`);
+    });
+  }
+
   app.use((req, res, next) => {
     res.set({
       'Content-Security-Policy': "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; frame-ancestors 'none'; form-action 'self'; base-uri 'none'",

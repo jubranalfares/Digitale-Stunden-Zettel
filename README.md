@@ -94,6 +94,13 @@ Falls Turso unter Storage nicht angeboten wird: auf [turso.tech](https://turso.t
 eine Datenbank anlegen und unter *Vercel → Settings → Environment Variables* `TURSO_DATABASE_URL` und
 `TURSO_AUTH_TOKEN` eintragen, dann Redeploy. Jede Änderung im Repository geht automatisch online.
 
+**Immer die feste Adresse verwenden** (im Vercel-Projekt unter *Domains*, z. B.
+`digitale-stunden-zettel.vercel.app`). Vercel gibt jedem Update zusätzlich eine eigene Adresse mit
+Zufallscode; dort kennt der Browser die Anmeldung nicht. Die App leitet solche Adressen deshalb
+automatisch auf die feste Adresse um. Die Daten selbst liegen in der Datenbank und bleiben bei Updates
+erhalten – unter **Inhaber → System** steht, welche Datenbank verwendet wird und wie viele Einträge
+gespeichert sind.
+
 ### Brauchen wir eine Datenbank?
 
 Ja – damit alle Zettel dauerhaft und für alle gemeinsam gespeichert sind. Verwendet wird SQLite (über libSQL):

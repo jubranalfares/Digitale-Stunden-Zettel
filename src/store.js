@@ -44,6 +44,14 @@ export class Store {
 
   // ---- Benutzer -------------------------------------------------------------
 
+  async counts() {
+    const row = await this.db.get(`
+      SELECT (SELECT COUNT(*) FROM users) AS users, (SELECT COUNT(*) FROM entries) AS entries,
+             (SELECT MAX(work_date) FROM entries) AS last_entry
+    `);
+    return { users: Number(row.users), entries: Number(row.entries), lastEntry: row.last_entry ?? null };
+  }
+
   async countUsers() {
     return Number((await this.db.get('SELECT COUNT(*) AS n FROM users')).n);
   }
