@@ -2,7 +2,7 @@
 <div class="page-head"><h1>Einstellungen</h1></div>
 
 <% if (welcome) { %>
-  <div class="flash flash-success">Eingerichtet! Hinterlegen Sie jetzt Ihre Unterschrift als Arbeitgeber und legen Sie danach Ihre Mitarbeiter an.</div>
+  <div class="flash flash-success">Eingerichtet! Sie sind Inhaber dieser Installation. Unter „Inhaber“ legen Sie die Chef-Zugänge an. Die Unterschrift des Arbeitgebers kann hier hinterlegt werden – oder der Chef unterschreibt bei seiner ersten Anmeldung selbst.</div>
 <% } %>
 
 <div class="card" id="unterschrift">
@@ -58,6 +58,16 @@
 </div>
 
 <% } %>
+
+<div class="card" id="darstellung">
+  <h2>Darstellung</h2>
+  <p class="muted small">Gilt für dieses Gerät. „Automatisch“ folgt der Einstellung des Handys bzw. Computers. Die Formulare bleiben immer weiß wie auf Papier.</p>
+  <div class="theme-choice" role="group" aria-label="Darstellung">
+    <button type="button" class="btn" data-theme-set="auto" aria-pressed="false">◐ Automatisch</button>
+    <button type="button" class="btn" data-theme-set="light" aria-pressed="false">☀ Hell</button>
+    <button type="button" class="btn" data-theme-set="dark" aria-pressed="false">☾ Dunkel</button>
+  </div>
+</div>
 
 <div class="card" id="passwort">
   <h2>Passwort ändern</h2>

@@ -16,6 +16,59 @@
     if (el && !window.confirm(el.dataset.confirm)) e.preventDefault();
   });
 
+  // ---- Hell/Dunkel ----------------------------------------------------------
+  // „auto“ folgt dem Handy/Computer; „light“/„dark“ werden pro Gerät gemerkt.
+
+  const systemDark = window.matchMedia('(prefers-color-scheme: dark)');
+  const THEME_LABEL = { auto: 'Automatisch', light: 'Hell', dark: 'Dunkel' };
+
+  const storedTheme = () => {
+    try {
+      const t = localStorage.getItem('theme');
+      return t === 'light' || t === 'dark' ? t : 'auto';
+    } catch {
+      return 'auto';
+    }
+  };
+  const effectiveTheme = (t) => (t === 'auto' ? (systemDark.matches ? 'dark' : 'light') : t);
+
+  function showTheme() {
+    const theme = storedTheme();
+    const dark = effectiveTheme(theme) === 'dark';
+    document.querySelectorAll('[data-theme-toggle]').forEach((btn) => {
+      const label = dark ? 'Hellen Modus einschalten' : 'Dunklen Modus einschalten';
+      btn.setAttribute('aria-label', label);
+      btn.title = label;
+      btn.querySelector('[data-theme-icon]').textContent = dark ? '☀' : '☾';
+    });
+    document.querySelectorAll('[data-theme-set]').forEach((btn) => {
+      btn.setAttribute('aria-pressed', String(btn.dataset.themeSet === theme));
+    });
+    const current = document.querySelector('[data-theme-current]');
+    if (current) current.textContent = THEME_LABEL[theme];
+  }
+
+  function setTheme(theme) {
+    if (theme === 'auto') delete document.documentElement.dataset.theme;
+    else document.documentElement.dataset.theme = theme;
+    try {
+      if (theme === 'auto') localStorage.removeItem('theme');
+      else localStorage.setItem('theme', theme);
+    } catch { /* nur für diese Seite */ }
+    showTheme();
+  }
+
+  document.addEventListener('click', (e) => {
+    const set = e.target.closest('[data-theme-set]');
+    if (set) return setTheme(set.dataset.themeSet);
+    if (!e.target.closest('[data-theme-toggle]')) return;
+    // Umschalter: immer sichtbar wechseln; entspricht das Ziel der Systemeinstellung, wieder „automatisch“.
+    const next = effectiveTheme(storedTheme()) === 'dark' ? 'light' : 'dark';
+    setTheme(next === effectiveTheme('auto') ? 'auto' : next);
+  });
+  systemDark.addEventListener?.('change', showTheme);
+  showTheme();
+
   // ---- Unterschriftenfeld ---------------------------------------------------
 
   const INK = '#14206e';

@@ -19,12 +19,11 @@ export default function adminRoutes({ store }) {
     res.send(await store.dumpSql());
   });
 
-  // ---- Mitarbeiterverwaltung -----------------------------------------------
+  // ---- Mitarbeiterverwaltung (nur Mitarbeiter; Chef-Zugänge verwaltet der Inhaber) ----
 
   const readUserForm = (body) => ({
     name: String(body.name ?? '').trim(),
     username: String(body.benutzername ?? '').trim(),
-    role: body.rolle === 'admin' ? 'admin' : 'employee',
     on_roster: body.einsatzliste ? 1 : 0,
   });
 
@@ -38,7 +37,7 @@ export default function adminRoutes({ store }) {
 
   const renderList = async (res, values = {}, error = null, status = 200) => res.status(status).render('admin/employees', {
     title: 'Mitarbeiter',
-    users: await store.listUsers(),
+    users: (await store.listUsers()).filter((u) => u.role === 'employee'),
     values,
     suggestedPassword: values.password || generatePassword(),
     error,
@@ -49,7 +48,7 @@ export default function adminRoutes({ store }) {
   });
 
   router.post('/mitarbeiter', async (req, res) => {
-    const values = { ...readUserForm(req.body), role: 'employee', on_roster: 1 };
+    const values = { ...readUserForm(req.body), on_roster: 1 };
     const password = String(req.body.passwort ?? '');
     const error = await userFormProblem(values) ?? passwordProblem(password);
     if (error) return renderList(res, { ...values, password }, error, 400);
@@ -67,13 +66,14 @@ export default function adminRoutes({ store }) {
     res.redirect('/admin/mitarbeiter');
   });
 
+  // Chefs bearbeiten hier nur Mitarbeiter. Andere Chef-/Inhaber-Zugänge sind tabu.
   const loadUser = async (req, res, next) => {
     req.target = await store.getUser(Number(req.params.id));
-    if (!req.target) return res.status(404).render('error', { title: 'Nicht gefunden', message: 'Benutzer nicht gefunden.' });
+    if (!req.target || req.target.role !== 'employee') {
+      return res.status(404).render('error', { title: 'Nicht gefunden', message: 'Mitarbeiter nicht gefunden.' });
+    }
     next();
   };
-
-  const activeAdminCount = async () => (await store.listUsers()).filter((u) => u.role === 'admin' && u.active).length;
 
   const renderEdit = async (res, target, values, error = null) => res.status(error ? 400 : 200).render('admin/employee-edit', {
     title: target.name,
@@ -90,10 +90,7 @@ export default function adminRoutes({ store }) {
 
   router.post('/mitarbeiter/:id', loadUser, async (req, res) => {
     const values = { ...readUserForm(req.body), active: req.body.aktiv ? 1 : 0 };
-    let error = await userFormProblem(values, req.target.id);
-    const losesAdmin = req.target.role === 'admin' && req.target.active && (values.role !== 'admin' || !values.active);
-    if (!error && losesAdmin && await activeAdminCount() <= 1) error = 'Es muss mindestens ein aktiver Chef bestehen bleiben.';
-    if (!error && req.target.id === req.user.id && !values.active) error = 'Sie können sich nicht selbst deaktivieren.';
+    const error = await userFormProblem(values, req.target.id);
     if (error) return renderEdit(res, req.target, { ...req.target, ...values }, error);
 
     await store.updateUser(req.target.id, values);

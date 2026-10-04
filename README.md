@@ -50,11 +50,35 @@ Die Unterschrift ist eine einfache elektronische Signatur; der Steuerberater akz
 
 ## Einrichtung (einmalig)
 
-1. App öffnen → **Ersteinrichtung**: Name des Betriebs und Chef-Zugang.
-2. Unter **Einstellungen** einmal als Chef unterschreiben.
-3. Unter **Mitarbeiter** jeden mit Name, Benutzername und Startpasswort anlegen.
-4. Mitarbeiter melden sich an, vergeben ein eigenes Passwort und unterschreiben einmal – fertig.
+1. App öffnen → **Ersteinrichtung**: Name des Betriebs und der erste Zugang. Wer das macht, wird
+   **Inhaber** (Betreiber der App).
+2. Unter **Inhaber** die Chef-Zugänge anlegen (Name, Benutzername, Startpasswort).
+3. Jeder Chef meldet sich an, vergibt ein eigenes Passwort und unterschreibt dabei einmal als
+   Arbeitgeber (geht auch später unter **Einstellungen**).
+4. Unter **Mitarbeiter** jeden mit Name, Benutzername und Startpasswort anlegen.
+5. Mitarbeiter melden sich an, vergeben ein eigenes Passwort und unterschreiben einmal – fertig.
    Tipp: im Handy-Browser „Zum Startbildschirm hinzufügen“, dann ist das Heft wie eine App da.
+
+## Rollen
+
+| | Mitarbeiter | Chef | Inhaber |
+|---|---|---|---|
+| Eigenen Stundenzettel / eigene Spalte der Einsatzliste beschreiben | ✓ | – | – |
+| Alles sehen, überall eintragen (als „AG“), PDF für den Steuerberater | – | ✓ | ✓ |
+| Mitarbeiter anlegen, bearbeiten, deaktivieren | – | ✓ | ✓ |
+| Chef-Zugänge anlegen/entfernen, Rollen verteilen, Passwörter zurücksetzen | – | – | ✓ |
+
+Der Bereich **Inhaber** erscheint nur bei Inhabern; alle anderen bekommen dort „Seite nicht gefunden“.
+Weitere Inhaber kann ein Inhaber ernennen. Damit sich niemand aussperrt, bleiben immer mindestens ein
+aktiver Inhaber und ein aktiver Chef bestehen. Wer schon Einträge oder Unterschriften im Heft hat, wird
+beim Entfernen nur deaktiviert (Aufbewahrungspflicht). Wer selbst auch Stunden schreibt, legt sich
+dafür zusätzlich einen normalen Mitarbeiter-Zugang an.
+
+## Hell / Dunkel
+
+Die App folgt automatisch der Einstellung des Handys bzw. Computers. Mit ☾/☀ oben in der Leiste
+(oder unter **Einstellungen → Darstellung**) lässt sich das pro Gerät umstellen. Die Formulare selbst
+bleiben immer weiß wie auf Papier.
 
 ## Online stellen mit Vercel (geht komplett vom Handy)
 
@@ -117,7 +141,7 @@ sehen dadurch gleich aus.
 ```
 server.js, api/index.js   Start (lokal / Vercel)
 src/routes/heft.js        Das Heft: Formulare anzeigen, Einträge speichern, PDF
-src/routes/…              Anmeldung, Einstellungen, Mitarbeiter
+src/routes/…              Anmeldung, Einstellungen, Mitarbeiter, Inhaber-Bereich
 src/entries.js            Regeln beim Speichern (Rechte, automatische Unterschrift)
 src/sheets.js, pdf.js     Formulardaten und PDF-Erzeugung
 src/db.js, store.js       Datenbank

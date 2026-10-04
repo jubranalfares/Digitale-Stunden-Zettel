@@ -1,0 +1,75 @@
+<%- include('partials/header') %>
+<div class="page-head">
+  <div>
+    <h1>Inhaber-Bereich</h1>
+    <div class="sub">Chef-Zugänge anlegen oder entfernen und Rollen verteilen. Diesen Bereich sehen nur Inhaber.</div>
+  </div>
+</div>
+
+<div class="card" id="neuer-chef">
+  <h2>Neuen Chef-Zugang anlegen</h2>
+  <% if (error) { %><div class="flash flash-error" role="alert"><%= error %></div><% } %>
+  <form method="post" action="/inhaber/chef" class="form-grid">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label>Name <input name="name" value="<%= values.name || '' %>" required></label>
+    <label>Benutzername <input name="benutzername" value="<%= values.username || '' %>" autocapitalize="none" autocomplete="off" required pattern="[A-Za-z0-9._@\-]{3,40}"></label>
+    <label>Startpasswort <input name="passwort" value="<%= suggestedPassword %>" minlength="8" required autocomplete="off"></label>
+    <div class="form-actions" style="align-self:end;margin:0"><button class="btn btn-primary" type="submit">Chef anlegen</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Alle Zugänge</h2>
+  <ul class="user-list">
+    <% users.forEach((u) => {
+         const self = u.id === user.id;
+         const roleLabel = u.is_owner ? 'Inhaber' : (u.role === 'admin' ? 'Chef' : 'Mitarbeiter');
+         const roleChip = u.is_owner ? 'chip-accent' : (u.role === 'admin' ? 'chip-ok' : '');
+    %>
+      <li class="user-row <%= u.active ? '' : 'inactive' %>">
+        <div class="user-info">
+          <strong><%= u.name %></strong><% if (self) { %> <span class="chip">Sie</span><% } %>
+          <div class="muted small">Benutzername: <%= u.username %></div>
+          <div class="user-chips">
+            <span class="chip <%= roleChip %>"><%= roleLabel %></span>
+            <% if (u.active) { %><span class="chip chip-ok">aktiv</span><% } else { %><span class="chip">inaktiv</span><% } %>
+            <% if (u.must_change_password) { %><span class="chip chip-warn">noch nicht angemeldet</span><% } %>
+          </div>
+        </div>
+        <div class="owner-actions">
+          <% if (!u.is_owner) { %>
+            <form method="post" action="/inhaber/benutzer/<%= u.id %>/rolle">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="rolle" value="<%= u.role === 'admin' ? 'employee' : 'admin' %>">
+              <button class="btn btn-small" type="submit" data-confirm="<%= u.role === 'admin' ? u.name + ' zum Mitarbeiter machen? Der Chef-Zugang entfällt dann.' : u.name + ' zum Chef machen? Diese Person sieht dann alle Stundenzettel.' %>"><%= u.role === 'admin' ? 'Zum Mitarbeiter' : 'Zum Chef' %></button>
+            </form>
+          <% } %>
+          <% if (u.role === 'admin' && !self) { %>
+            <form method="post" action="/inhaber/benutzer/<%= u.id %>/inhaber">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button class="btn btn-small" type="submit" data-confirm="<%= u.is_owner ? 'Inhaber-Recht von ' + u.name + ' entziehen?' : u.name + ' zum Inhaber machen? Diese Person kann dann ebenfalls Chef-Zugänge verwalten.' %>"><%= u.is_owner ? 'Inhaber-Recht entziehen' : 'Zum Inhaber' %></button>
+            </form>
+          <% } %>
+          <% if (!self) { %>
+            <form method="post" action="/inhaber/benutzer/<%= u.id %>/aktiv">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="aktiv" value="<%= u.active ? '' : '1' %>">
+              <button class="btn btn-small" type="submit"><%= u.active ? 'Deaktivieren' : 'Aktivieren' %></button>
+            </form>
+            <form method="post" action="/inhaber/benutzer/<%= u.id %>/passwort">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <input type="hidden" name="passwort" value="<%= suggestedPassword %>">
+              <button class="btn btn-small" type="submit" data-confirm="Neues Startpasswort für <%= u.name %> setzen?">Passwort neu</button>
+            </form>
+            <form method="post" action="/inhaber/benutzer/<%= u.id %>/loeschen">
+              <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+              <button class="btn btn-small btn-danger" type="submit" data-confirm="<%= u.name %> wirklich entfernen? (Wer schon Einträge im Heft hat, wird nur deaktiviert.)">Entfernen</button>
+            </form>
+          <% } %>
+        </div>
+      </li>
+    <% }) %>
+  </ul>
+  <p class="muted small" style="margin-top:12px">Beim Anlegen und beim Zurücksetzen wird dieses Startpasswort verwendet: <code><%= suggestedPassword %></code>. Notieren und weitergeben; beim nächsten Seitenaufruf wird ein neues vorgeschlagen.</p>
+</div>
+<%- include('partials/footer') %>

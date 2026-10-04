@@ -234,6 +234,140 @@ test('Datensicherung', async () => {
   assert.equal((await anna.get('/admin/sicherung')).status, 403);
 });
 
+test('Der Einrichter ist Inhaber – nur er sieht den Inhaber-Bereich', async () => {
+  const owner = await store.getUserByUsername('chef');
+  assert.equal(owner.is_owner, 1);
+  assert.match((await chef.get('/einsatzliste')).data, /href="\/inhaber"/);
+  const panel = await chef.get('/inhaber');
+  assert.equal(panel.status, 200);
+  assert.match(panel.data, /Neuen Chef-Zugang anlegen/);
+
+  const asEmployee = await anna.get('/inhaber');
+  assert.equal(asEmployee.status, 404);
+  assert.doesNotMatch((await anna.get('/zettel')).data, /\/inhaber/);
+});
+
+const marco = new Client();
+
+test('Inhaber legt einen zweiten Chef an', async () => {
+  await chef.get('/inhaber');
+  const bad = await chef.post('/inhaber/chef', { name: 'Marco Rossi', benutzername: 'anna', passwort: 'chef23456' });
+  assert.equal(bad.status, 400);
+  assert.match(bad.data, /bereits vergeben/);
+
+  const created = await chef.follow('/inhaber/chef', { name: 'Marco Rossi', benutzername: 'marco', passwort: 'chef23456' });
+  assert.match(created.data, /Chef-Zugang für Marco Rossi angelegt/);
+  const user = await store.getUserByUsername('marco');
+  assert.equal(user.role, 'admin');
+  assert.equal(user.is_owner, 0);
+  assert.equal(user.on_roster, 0);
+  assert.equal(user.must_change_password, 1);
+
+  assert.equal((await marco.post('/login', { benutzername: 'marco', passwort: 'chef23456' })).location, '/');
+  const welcome = await marco.get('/willkommen');
+  assert.doesNotMatch(welcome.data, /data-sigpad/, 'Arbeitgeber-Unterschrift gibt es schon');
+  assert.equal((await marco.post('/willkommen', { passwort: 'marco12345', passwort2: 'marco12345' })).location, '/');
+  assert.equal((await marco.get('/einsatzliste')).status, 200);
+});
+
+test('Ein Chef ohne Inhaber-Recht sieht und erreicht den Inhaber-Bereich nicht', async () => {
+  const owner = await store.getUserByUsername('chef');
+  const page = await marco.get('/einsatzliste');
+  assert.doesNotMatch(page.data, /href="\/inhaber"/);
+  assert.equal((await marco.get('/inhaber')).status, 404);
+  assert.equal((await marco.post(`/inhaber/benutzer/${owner.id}/aktiv`, { aktiv: '' })).status, 404);
+  assert.equal((await marco.post(`/inhaber/benutzer/${owner.id}/passwort`, { passwort: 'uebernahme1' })).status, 404);
+  assert.equal((await marco.post('/inhaber/chef', { name: 'X', benutzername: 'xchef', passwort: 'chef23456' })).status, 404);
+  assert.equal(await store.getUserByUsername('xchef'), null);
+  assert.equal((await store.getUser(owner.id)).active, 1);
+
+  // Die Mitarbeiterverwaltung des Chefs zeigt und bearbeitet nur Mitarbeiter.
+  const list = await marco.get('/admin/mitarbeiter');
+  assert.match(list.data, /Anna Müller/);
+  assert.doesNotMatch(list.data, new RegExp(`/admin/mitarbeiter/${owner.id}"`));
+  assert.equal((await marco.get(`/admin/mitarbeiter/${owner.id}`)).status, 404);
+  assert.equal((await marco.post(`/admin/mitarbeiter/${owner.id}/passwort`, { passwort: 'uebernahme1' })).status, 404);
+  assert.equal((await marco.post(`/admin/mitarbeiter/${owner.id}`, { name: 'Chef', benutzername: 'chef', aktiv: '' })).status, 404);
+  const created = await marco.follow('/admin/mitarbeiter', { name: 'Neu Chef', benutzername: 'neuchef', passwort: 'start1234', rolle: 'admin' });
+  assert.equal(created.status, 200);
+  assert.equal((await store.getUserByUsername('neuchef')).role, 'employee');
+});
+
+test('Inhaber verteilt Rechte – mit Schutz vor dem Aussperren', async () => {
+  const owner = await store.getUserByUsername('chef');
+  const m = await store.getUserByUsername('marco');
+  await chef.get('/inhaber');
+
+  let page = await chef.follow(`/inhaber/benutzer/${owner.id}/aktiv`, { aktiv: '' });
+  assert.match(page.data, /nicht selbst deaktivieren/);
+  page = await chef.follow(`/inhaber/benutzer/${owner.id}/inhaber`, {});
+  assert.match(page.data, /eigenes Inhaber-Recht/);
+  page = await chef.follow(`/inhaber/benutzer/${owner.id}/loeschen`, {});
+  assert.match(page.data, /nicht selbst entfernen/);
+  assert.equal((await store.getUser(owner.id)).is_owner, 1);
+
+  page = await chef.follow(`/inhaber/benutzer/${m.id}/rolle`, { rolle: 'employee' });
+  assert.match(page.data, /Marco Rossi ist jetzt Mitarbeiter/);
+  assert.equal((await store.getUser(m.id)).on_roster, 1);
+  assert.equal((await marco.get('/admin/mitarbeiter')).status, 403);
+  page = await chef.follow(`/inhaber/benutzer/${m.id}/inhaber`, {});
+  assert.match(page.data, /Nur ein Chef kann Inhaber-Rechte erhalten/);
+
+  await chef.follow(`/inhaber/benutzer/${m.id}/rolle`, { rolle: 'admin' });
+  page = await chef.follow(`/inhaber/benutzer/${m.id}/inhaber`, {});
+  assert.match(page.data, /Marco Rossi hat jetzt Inhaber-Rechte/);
+  assert.equal((await marco.get('/inhaber')).status, 200);
+  page = await chef.follow(`/inhaber/benutzer/${m.id}/rolle`, { rolle: 'employee' });
+  assert.match(page.data, /zuerst das Inhaber-Recht entzogen/);
+
+  page = await chef.follow(`/inhaber/benutzer/${m.id}/inhaber`, {});
+  assert.match(page.data, /keine Inhaber-Rechte mehr/);
+  assert.equal((await marco.get('/inhaber')).status, 404);
+});
+
+test('Inhaber setzt Passwörter zurück, deaktiviert und entfernt Zugänge', async () => {
+  const m = await store.getUserByUsername('marco');
+  await chef.get('/inhaber');
+  let page = await chef.follow(`/inhaber/benutzer/${m.id}/passwort`, { passwort: 'neu-start1' });
+  assert.match(page.data, /Neues Startpasswort für Marco Rossi/);
+  assert.equal((await marco.get('/einsatzliste')).location, '/login', 'alte Sitzung beendet');
+  assert.equal((await marco.post('/login', { benutzername: 'marco', passwort: 'neu-start1' })).location, '/');
+  assert.equal((await marco.get('/einsatzliste')).location, '/willkommen');
+
+  page = await chef.follow(`/inhaber/benutzer/${m.id}/aktiv`, { aktiv: '' });
+  assert.match(page.data, /Marco Rossi ist jetzt deaktiviert/);
+  assert.equal((await marco.get('/einsatzliste')).location, '/login');
+  assert.equal((await marco.post('/login', { benutzername: 'marco', passwort: 'neu-start1' })).status, 401);
+
+  // Ohne Einträge im Heft: wirklich weg. Mit Einträgen: nur deaktiviert (Aufbewahrungspflicht).
+  page = await chef.follow(`/inhaber/benutzer/${m.id}/loeschen`, {});
+  assert.match(page.data, /Marco Rossi wurde entfernt/);
+  assert.equal(await store.getUserByUsername('marco'), null);
+
+  const a = await store.getUserByUsername('anna');
+  const signatures = (await db.all('SELECT COUNT(*) AS n FROM signatures')).at(0).n;
+  page = await chef.follow(`/inhaber/benutzer/${a.id}/loeschen`, {});
+  assert.match(page.data, /nur deaktiviert/);
+  assert.equal((await store.getUser(a.id)).active, 0);
+  assert.equal((await db.all('SELECT COUNT(*) AS n FROM signatures')).at(0).n, signatures);
+  await chef.follow(`/inhaber/benutzer/${a.id}/aktiv`, { aktiv: '1' });
+  assert.equal((await store.getUser(a.id)).active, 1);
+});
+
+test('Der letzte Inhaber und der letzte Chef bleiben bestehen', async () => {
+  const owner = await store.getUserByUsername('chef');
+  // Direkt in der Datenbank einen zweiten Inhaber anlegen und wieder aussperren wollen.
+  const id = await store.createUser({ username: 'zweit', passwordHash: 'x', role: 'admin', name: 'Zweit', isOwner: true });
+  await chef.get('/inhaber');
+  let page = await chef.follow(`/inhaber/benutzer/${id}/inhaber`, {});
+  assert.match(page.data, /keine Inhaber-Rechte mehr/);
+  assert.equal(await store.countActiveOwners(), 1);
+  page = await chef.follow(`/inhaber/benutzer/${id}/loeschen`, {});
+  assert.match(page.data, /Zweit wurde entfernt/);
+  assert.equal((await store.getUser(owner.id)).is_owner, 1);
+  assert.equal((await store.getUser(owner.id)).active, 1);
+});
+
 test('Falsches Passwort wird abgelehnt', async () => {
   const res = await new Client().post('/login', { benutzername: 'anna', passwort: 'falsch' });
   assert.equal(res.status, 401);

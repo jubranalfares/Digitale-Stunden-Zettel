@@ -37,8 +37,10 @@ export default function authRoutes({ store, config }) {
     if (error) return res.status(400).render('setup', { title: 'Ersteinrichtung', values, error });
 
     await store.setSetting('company_name', values.company);
+    // Der erste Zugang ist der Inhaber (Betreiber): darf später Chef-Zugänge anlegen und Rollen verteilen.
     const id = await store.createUser({
       username: values.username, passwordHash: await hashPassword(password), role: 'admin', name: values.name,
+      onRoster: false, isOwner: true,
     });
     await startSession(req, res, store, config, id);
     res.redirect('/einstellungen?willkommen=1#unterschrift');
@@ -80,9 +82,12 @@ export default function authRoutes({ store, config }) {
 
   // ---- Erste Anmeldung: eigenes Passwort + Unterschrift ---------------------
 
+  // Ein neuer Chef unterschreibt hier gleich als Arbeitgeber, solange noch keine Arbeitgeber-Unterschrift existiert.
+  const asksEmployerSignature = (req, res) => req.user.role === 'admin' && !res.locals.settings.employer_signature_id;
+
   router.get('/willkommen', requireLogin, (req, res) => {
     if (!req.user.must_change_password) return res.redirect('/');
-    res.render('welcome', { title: 'Willkommen', error: null });
+    res.render('welcome', { title: 'Willkommen', error: null, employerSignature: asksEmployerSignature(req, res) });
   });
 
   router.post('/willkommen', requireLogin, async (req, res) => {
@@ -94,12 +99,16 @@ export default function authRoutes({ store, config }) {
     if (password !== String(req.body.passwort2 ?? '')) error = 'Die Passwörter stimmen nicht überein.';
     else error = passwordProblem(password);
     if (!error && isEmployee && !signature) error = 'Bitte unterschreiben Sie im Feld „Unterschrift“.';
-    if (error) return res.status(400).render('welcome', { title: 'Willkommen', error });
+    const employerSignature = asksEmployerSignature(req, res);
+    if (error) return res.status(400).render('welcome', { title: 'Willkommen', error, employerSignature });
 
-    if (signature) await store.setUserSignature(req.user.id, signature);
+    if (signature && isEmployee) await store.setUserSignature(req.user.id, signature);
+    if (signature && employerSignature) await store.setEmployerSignature(req.user.id, signature);
     await store.updateUser(req.user.id, { password_hash: await hashPassword(password), must_change_password: 0 });
     await store.deleteUserSessions(req.user.id, req.session.id_hash);
-    await req.flash('success', 'Alles eingerichtet! Ihre Unterschrift wird ab jetzt automatisch bei jedem Eintrag gesetzt.');
+    await req.flash('success', isEmployee || signature
+      ? 'Alles eingerichtet! Ihre Unterschrift wird ab jetzt automatisch gesetzt.'
+      : 'Alles eingerichtet!');
     res.redirect('/');
   });
 

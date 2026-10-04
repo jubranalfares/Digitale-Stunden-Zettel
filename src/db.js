@@ -76,6 +76,12 @@ const MIGRATIONS = [
     data       TEXT
   );
   `,
+  // Inhaber-Rolle über den Chefs: darf Chef-Zugänge anlegen/entfernen und Rollen verteilen.
+  // Bei bereits eingerichteten Installationen wird der erste angelegte Zugang zum Inhaber.
+  `
+  ALTER TABLE users ADD COLUMN is_owner INTEGER NOT NULL DEFAULT 0;
+  UPDATE users SET is_owner = 1 WHERE id = (SELECT MIN(id) FROM users);
+  `,
 ];
 
 export const isLocalUrl = (url) => url === ':memory:' || url.startsWith('file:');
@@ -124,11 +130,18 @@ export class Database {
       const statements = MIGRATIONS[v].split(/;\s*\n/)
         .map((s) => s.replace(/--.*$/gm, '').trim()).filter(Boolean)
         .map((s) => s.replace(/^CREATE (TABLE|INDEX) (?!IF NOT EXISTS)/, 'CREATE $1 IF NOT EXISTS '));
-      await this.batch([
-        ...statements.map((s) => [s]),
-        ['DELETE FROM schema_version'],
-        ['INSERT INTO schema_version (version) VALUES (?)', [v + 1]],
-      ]);
+      try {
+        await this.batch([
+          ...statements.map((s) => [s]),
+          ['DELETE FROM schema_version'],
+          ['INSERT INTO schema_version (version) VALUES (?)', [v + 1]],
+        ]);
+      } catch (err) {
+        // War ein anderer Server schneller (z. B. Spalte schon angelegt), ist die Version inzwischen weiter.
+        const now = Number((await this.get('SELECT version FROM schema_version'))?.version ?? 0);
+        if (now <= v) throw err;
+        v = now - 1;
+      }
     }
   }
 

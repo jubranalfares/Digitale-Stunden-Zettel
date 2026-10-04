@@ -13,6 +13,7 @@ import {
 import adminRoutes from './routes/admin.js';
 import authRoutes from './routes/auth.js';
 import heftRoutes from './routes/heft.js';
+import ownerRoutes from './routes/owner.js';
 import settingsRoutes from './routes/settings.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -80,6 +81,7 @@ export function createApp({ config, db = new LazyDatabase(config) }) {
   app.use(authRoutes(ctx));
   app.use(settingsRoutes(ctx));
   app.use(heftRoutes(ctx));
+  app.use(ownerRoutes(ctx));
   app.use('/admin', adminRoutes(ctx));
 
   // Unterschriften als Bild: eigene, die des Arbeitgebers – der Chef darf alle sehen.
