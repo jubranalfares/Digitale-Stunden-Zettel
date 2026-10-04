@@ -2,11 +2,11 @@
 <div class="auth-wrap">
   <div class="card auth-card wide">
     <div class="auth-brand">
-      <span class="brand-mark" aria-hidden="true">⏱</span>
+      <span class="brand-mark"><%- include('partials/logo') %></span>
       <div><strong>Digitale Stundenzettel</strong><span><%= settings.company_name %></span></div>
     </div>
     <h1>Willkommen, <%= user.name %>!</h1>
-    <p class="muted">Bitte einmalig ein eigenes Passwort vergeben<% if (user.role === 'employee') { %> und unterschreiben. Ihre Unterschrift wird danach bei jedem Eintrag automatisch auf Ihren Stundenzettel und die Einsatzliste gesetzt – Sie müssen nie wieder von Hand unterschreiben<% } %>.</p>
+    <p class="muted">Bitte legen Sie einmal ein eigenes Passwort fest<% if (user.role === 'employee') { %> und unterschreiben Sie unten. Ihre Unterschrift wird danach bei jedem Eintrag automatisch gesetzt, Sie müssen also nie wieder von Hand unterschreiben<% } %>.</p>
     <% if (error) { %><div class="flash flash-error" role="alert"><%= error %></div><% } %>
     <form method="post" action="/willkommen" class="stack" data-signature-form>
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
@@ -25,7 +25,7 @@
         </div>
       <% } else if (locals.employerSignature) { %>
         <div>
-          <label style="margin-bottom:6px">Unterschrift des Arbeitgebers <span class="hint">(einmalig – erscheint automatisch auf allen Stundenzetteln und der Einsatzliste; kann auch später unter Einstellungen erfolgen)</span></label>
+          <label style="margin-bottom:6px">Unterschrift des Arbeitgebers <span class="hint">(Sie steht dann auf allen Stundenzetteln und der Einsatzliste. Das geht auch später unter Einstellungen.)</span></label>
           <%- include('partials/signature-pad', { required: false }) %>
         </div>
       <% } %>

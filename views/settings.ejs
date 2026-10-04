@@ -2,22 +2,22 @@
 <div class="page-head"><h1>Einstellungen</h1></div>
 
 <% if (welcome) { %>
-  <div class="flash flash-success">Eingerichtet! Sie sind Inhaber dieser Installation. Unter „Inhaber“ legen Sie die Chef-Zugänge an. Die Unterschrift des Arbeitgebers kann hier hinterlegt werden – oder der Chef unterschreibt bei seiner ersten Anmeldung selbst.</div>
+  <div class="flash flash-success">Fertig eingerichtet. Unter „Inhaber“ können Sie jetzt die Zugänge für die Chefs anlegen. Die Unterschrift des Arbeitgebers können Sie hier hinterlegen. Sonst macht das der Chef bei seiner ersten Anmeldung.</div>
 <% } %>
 
 <div class="card" id="unterschrift">
   <h2><%= isAdmin ? 'Unterschrift des Arbeitgebers' : 'Meine Unterschrift' %></h2>
   <p class="muted small">
     <% if (isAdmin) { %>
-      Einmal hinterlegen – sie erscheint automatisch auf jedem Stundenzettel und auf der Einsatzliste, jeweils mit dem passenden Datum.
+      Einmal unterschreiben reicht. Die Unterschrift steht dann automatisch auf jedem Stundenzettel und auf der Einsatzliste.
     <% } else { %>
-      Einmal hinterlegen – sie wird bei jedem Eintrag automatisch auf Ihren Stundenzettel und die Einsatzliste gesetzt.
+      Einmal unterschreiben reicht. Danach steht Ihre Unterschrift bei jedem Eintrag automatisch auf dem Stundenzettel und der Einsatzliste.
     <% } %>
   </p>
   <% if (signature) { %>
     <p class="small" style="margin-bottom:6px"><strong>Aktuell hinterlegt</strong> <span class="muted">(seit <%= formatDateDE(signature.created_at.slice(0, 10)) %>)</span></p>
     <div class="sig-preview" style="margin-bottom:16px"><img src="/signatur/<%= signature.id %>.png" alt="Hinterlegte Unterschrift"></div>
-    <p class="small muted">Neue Unterschrift? Einfach unten neu unterschreiben und speichern. Bereits unterschriebene Einträge behalten ihre bisherige Unterschrift.</p>
+    <p class="small muted">Sie möchten neu unterschreiben? Dann einfach unten unterschreiben und speichern. Ältere Einträge behalten ihre bisherige Unterschrift.</p>
   <% } %>
   <form method="post" action="/einstellungen/unterschrift" data-signature-form>
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
@@ -28,7 +28,7 @@
 
 <% if (isAdmin) { %>
 <div class="card" id="betrieb">
-  <h2>Betrieb &amp; Formulare</h2>
+  <h2>Betrieb und Formulare</h2>
   <form method="post" action="/einstellungen/betrieb" class="form-grid">
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <label>Firma <span class="hint">(auf allen Formularen)</span> <input name="firma" value="<%= settings.company_name %>" required maxlength="80"></label>
@@ -53,7 +53,7 @@
 <% if (isAdmin) { %>
 <div class="card" id="sicherung">
   <h2>Datensicherung</h2>
-  <p class="muted small">Alle Stundenzettel, Unterschriften und Mitarbeiter in einer Datei. Am besten monatlich nach dem Export herunterladen und sicher aufbewahren (Arbeitszeitnachweise mindestens 2 Jahre aufbewahren).</p>
+  <p class="muted small">Alle Stundenzettel, Unterschriften und Mitarbeiter in einer Datei. Laden Sie die Sicherung am besten einmal im Monat herunter. Arbeitszeitnachweise müssen mindestens zwei Jahre aufbewahrt werden.</p>
   <a class="btn" href="/admin/sicherung">Sicherung herunterladen</a>
 </div>
 
@@ -61,7 +61,7 @@
 
 <div class="card" id="darstellung">
   <h2>Darstellung</h2>
-  <p class="muted small">Gilt für dieses Gerät. „Automatisch“ folgt der Einstellung des Handys bzw. Computers. Die Formulare bleiben immer weiß wie auf Papier.</p>
+  <p class="muted small">Gilt nur für dieses Gerät. Bei „Automatisch“ richtet sich die App nach Ihrem Handy oder Computer. Die Formulare selbst bleiben immer weiß.</p>
   <div class="theme-choice" role="group" aria-label="Darstellung">
     <button type="button" class="btn" data-theme-set="auto" aria-pressed="false">◐ Automatisch</button>
     <button type="button" class="btn" data-theme-set="light" aria-pressed="false">☀ Hell</button>

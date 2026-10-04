@@ -120,7 +120,7 @@ export function requireLogin(req, res, next) {
 
 export function requireAdmin(req, res, next) {
   if (req.user?.role !== 'admin') {
-    return res.status(403).render('error', { title: 'Kein Zugriff', message: 'Dieser Bereich ist nur für den Chef bzw. Administratoren.' });
+    return res.status(403).render('error', { title: 'Kein Zugriff', message: 'Diesen Bereich kann nur der Chef öffnen.' });
   }
   next();
 }

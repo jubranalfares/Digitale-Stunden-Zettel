@@ -37,7 +37,7 @@ export default function authRoutes({ store, config }) {
     const password = String(req.body.passwort ?? '');
     let error = null;
     if (!values.company || !values.name || !values.username) error = 'Bitte alle Felder ausfüllen.';
-    else if (!/^[\w.@-]{3,40}$/.test(values.username)) error = 'Der Benutzername darf nur Buchstaben, Zahlen sowie . _ - @ enthalten (3–40 Zeichen).';
+    else if (!/^[\w.@-]{3,40}$/.test(values.username)) error = 'Der Benutzername darf nur Buchstaben, Zahlen sowie . _ - @ enthalten (3 bis 40 Zeichen).';
     else if (password !== String(req.body.passwort2 ?? '')) error = 'Die Passwörter stimmen nicht überein.';
     else error = passwordProblem(password);
     if (error) return res.status(400).render('setup', { title: 'Ersteinrichtung', values, error, dbInfo: dbInfo() });

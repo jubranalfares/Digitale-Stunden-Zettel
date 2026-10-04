@@ -52,10 +52,7 @@
                 data-code="<%= c ? c.code : '' %>" data-remarks="<%= c ? c.remarks : '' %>"<% } %>>
               <div class="rc" data-cell-view>
                 <% if (c) { %>
-                  <div class="rc-text" style="font-size:<%= pt(c.duration ? 8.5 : 9) %>">
-                    <% if (c.duration) { %><span><%= c.duration %></span><% } %>
-                    <% if (c.code) { %><span class="rc-code <%= c.duration ? '' : 'only' %>"><%= c.code %></span><% } %>
-                  </div>
+                  <% if (c.code && !c.duration) { %><span class="rc-code"><%= c.code %></span><% } %>
                   <% if (c.signatureId && showSignature(emp)) { %><img src="/signatur/<%= c.signatureId %>.png" alt="Unterschrift">
                   <% } else if (c.signatureId) { %><span class="rc-ok" title="unterschrieben">✓</span>
                   <% } else if (c.recordedByEmployer) { %><span class="rc-ag">AG</span><% } %>

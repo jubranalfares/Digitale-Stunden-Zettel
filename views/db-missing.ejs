@@ -2,24 +2,24 @@
 <div class="auth-wrap">
   <div class="card auth-card wide">
     <div class="auth-brand">
-      <span class="brand-mark" aria-hidden="true">⏱</span>
+      <span class="brand-mark"><%- include('partials/logo') %></span>
       <div><strong>Digitale Stundenzettel</strong><span>Fast geschafft</span></div>
     </div>
     <% if (problem) { %>
       <h1>Datenbank nicht erreichbar</h1>
-      <p>Die Zugangsdaten sind eingetragen, aber die Verbindung klappt nicht. Meist passt der Token nicht – in Turso einen neuen Token erzeugen, in Vercel eintragen und neu deployen.</p>
+      <p>Die Zugangsdaten sind eingetragen, aber die Verbindung klappt nicht. Meistens passt der Token nicht. Erzeugen Sie in Turso einen neuen Token, tragen Sie ihn in Vercel ein und starten Sie ein neues Deployment.</p>
       <div class="flash flash-error small">Fehlermeldung: <%= problem %></div>
       <% if (locals.address) { %>
         <p class="small">Verwendete Adresse<% if (locals.variable) { %> (aus <code><%= variable %></code>)<% } %>:<br><code style="overflow-wrap:anywhere"><%= address %></code></p>
       <% } %>
     <% } else { %>
       <h1>Noch eine Datenbank verbinden</h1>
-      <p>Die App läuft – sie braucht nur noch einen Ort, an dem die Stundenzettel dauerhaft gespeichert werden.
-        Vercel selbst speichert keine Dateien.</p>
+      <p>Die App läuft schon. Es fehlt nur noch ein Ort, an dem die Stundenzettel dauerhaft gespeichert werden,
+        denn Vercel selbst speichert keine Dateien.</p>
       <ol class="steps">
         <li>Im Vercel-Projekt auf <strong>Storage</strong> tippen.</li>
-        <li><strong>Create Database</strong> → <strong>Turso</strong> wählen (kostenlos) und mit diesem Projekt verbinden.</li>
-        <li>Unter <strong>Deployments</strong> beim obersten Eintrag <strong>⋯ → Redeploy</strong> tippen.</li>
+        <li>Auf <strong>Create Database</strong> tippen, <strong>Turso</strong> wählen (kostenlos) und mit diesem Projekt verbinden.</li>
+        <li>Unter <strong>Deployments</strong> beim obersten Eintrag auf die drei Punkte und dann auf <strong>Redeploy</strong> tippen.</li>
       </ol>
     <% } %>
     <p class="muted small">Gefundene Datenbank-Variablen: <%= found.length ? found.join(', ') : 'keine' %></p>

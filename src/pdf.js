@@ -191,7 +191,7 @@ export function drawEmployeeSheet(doc, sheet) {
 
   if (sheet.rows.some((r) => r.recordedByEmployer)) {
     doc.font(L.font).fontSize(7).fillColor('#444')
-      .text('AG = vom Arbeitgeber erfasst bzw. korrigiert', L.left, K.y + keyH + 8, { lineBreak: false });
+      .text('AG: vom Arbeitgeber eingetragen oder korrigiert', L.left, K.y + keyH + 8, { lineBreak: false });
   }
 }
 
@@ -275,16 +275,13 @@ function drawName(doc, name, x, y, w, h) {
 }
 
 function drawRosterCell(doc, cell, x, y, w, h) {
-  const textW = 27;
-  if (cell.duration) {
-    cellText(doc, cell.duration, x + 0.5, cell.code ? y - 3.6 : y, textW, h, { font: ROSTER.font, size: 8.5, align: 'left' });
-    if (cell.code) cellText(doc, cell.code, x + 0.5, y + 4.2, textW, h, { font: ROSTER.fontBold, size: 6.5, align: 'left' });
-  } else if (cell.code) {
-    cellText(doc, cell.code, x + 0.5, y, textW, h, { font: ROSTER.fontBold, size: 9, align: 'left' });
+  // In der Einsatzliste steht nur die Unterschrift; die Stunden zählt die Zeile "Summe".
+  if (cell.code && !cell.duration) {
+    cellText(doc, cell.code, x + 0.5, y, 22, h, { font: ROSTER.fontBold, size: 9, align: 'left' });
   }
   if (cell.signature) {
-    drawImage(doc, cell.signature, x + textW, y + 1.2, w - textW - 1.5, h - 2.4, 'right');
+    drawImage(doc, cell.signature, x + 2, y + 1.2, w - 4, h - 2.4, 'center');
   } else if (cell.recordedByEmployer) {
-    cellText(doc, 'AG', x + textW, y, w - textW - 2, h, { font: ROSTER.font, size: 6.5, align: 'right', color: '#666' });
+    cellText(doc, 'AG', x, y, w, h, { font: ROSTER.font, size: 6.5, align: 'center', color: '#666' });
   }
 }

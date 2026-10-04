@@ -1,9 +1,10 @@
 <%#
-  Eingabefenster für einen Tag: Beginn und Ende mit großen Knöpfen wählen (erst Stunde, dann Minuten),
-  Pause und Kürzel antippen, speichern. Wird von public/js/app.js gesteuert.
+  Eingabefenster für einen Tag: Beginn und Ende wählen, speichern.
+  Stunden und Minuten stehen auf einem Bildschirm. Gesteuert von public/js/app.js.
 %>
 <dialog class="entry-dialog" data-entry-dialog aria-labelledby="entry-title">
   <form method="dialog" class="entry-form" data-entry-form novalidate>
+    <div class="sheet-grip" aria-hidden="true"></div>
     <header class="entry-head">
       <div>
         <h2 id="entry-title" data-entry-title tabindex="-1"></h2>
@@ -16,54 +17,31 @@
       <div class="time-tiles">
         <button type="button" class="time-tile" data-tile="start">
           <span class="tile-label">Beginn</span>
-          <span class="tile-value" data-tile-value="start">––:––</span>
+          <span class="tile-value" data-tile-value="start">--:--</span>
         </button>
         <span class="tile-sep" aria-hidden="true">bis</span>
         <button type="button" class="time-tile" data-tile="end">
           <span class="tile-label">Ende</span>
-          <span class="tile-value" data-tile-value="end">––:––</span>
+          <span class="tile-value" data-tile-value="end">--:--</span>
         </button>
       </div>
 
       <div class="picker" data-picker>
-        <div class="picker-head" data-picker-head></div>
-        <div class="picker-grid picker-hours" data-grid="hour">
+        <p class="picker-head" data-picker-head></p>
+        <div class="picker-grid" role="group" aria-label="Stunde">
           <% for (let h = 0; h < 24; h++) { %><button type="button" data-hour="<%= h %>"><%= h %></button><% } %>
         </div>
-        <div class="picker-grid picker-minutes" data-grid="minute" hidden>
-          <% for (let m = 0; m < 60; m += 5) { %><button type="button" data-minute="<%= m %>">:<%= String(m).padStart(2, '0') %></button><% } %>
+        <div class="picker-minutes" role="group" aria-label="Minuten" data-minutes>
+          <% [0, 15, 30, 45].forEach((m) => { %><button type="button" data-minute="<%= m %>">:<%= String(m).padStart(2, '0') %></button><% }) %>
         </div>
       </div>
-      <button type="button" class="link-btn" data-clear-times hidden>Zeiten entfernen</button>
-
-      <div class="entry-section">
-        <div class="entry-label">Pause</div>
-        <div class="chips" data-pause-chips>
-          <% [0, 15, 30, 45, 60, 90].forEach((m) => { %>
-            <button type="button" class="chip-btn" data-pause="<%= m %>"><%= m ? `${m} min` : 'keine' %></button>
-          <% }) %>
-        </div>
-      </div>
-
-      <div class="entry-section">
-        <div class="entry-label">Kürzel <span class="hint">(nur wenn zutreffend)</span></div>
-        <div class="chips">
-          <% Object.entries(CODES).forEach(([code, text]) => { %>
-            <button type="button" class="chip-btn" data-code="<%= code %>" data-label="<%= text %>"><strong><%= code %></strong> <%= text %></button>
-          <% }) %>
-        </div>
-      </div>
-
-      <label class="entry-section entry-label">Bemerkung <span class="hint">(optional)</span>
-        <input data-remarks maxlength="200" autocomplete="off" enterkeyhint="done">
-      </label>
     </div>
 
     <footer class="entry-foot">
-      <div class="entry-summary" data-entry-summary aria-live="polite"></div>
+      <div class="entry-total" data-entry-total aria-live="polite"></div>
       <div class="entry-error" data-entry-error role="alert" hidden></div>
       <div class="entry-actions">
-        <button type="button" class="btn btn-danger" data-entry-delete>Löschen</button>
+        <button type="button" class="btn btn-ghost btn-delete" data-entry-delete>Löschen</button>
         <button type="submit" class="btn btn-primary" data-entry-save>Speichern</button>
       </div>
     </footer>

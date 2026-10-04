@@ -53,7 +53,7 @@
               <td><%= r.end || '' %></td>
               <td><%= r.duration || '' %></td>
               <td class="code"><%= r.code || '' %></td>
-              <td class="ag"><%= r.recordedOn || '' %><% if (r.recordedByEmployer) { %> <small title="vom Arbeitgeber erfasst bzw. korrigiert">AG</small><% } %></td>
+              <td class="ag"><%= r.recordedOn || '' %><% if (r.recordedByEmployer) { %> <small title="vom Arbeitgeber eingetragen oder korrigiert">AG</small><% } %></td>
               <td class="remarks" title="<%= r.remarks || '' %>"><%= r.remarks || '' %></td>
             </tr>
           <% } %>
@@ -80,6 +80,6 @@
       <div class="abs" style="<%= at(K.codeX, K.y + i * K.rowH + 1.2) %>;font-size:<%= pt(K.size) %>"><%= code %></div>
       <div class="abs" style="<%= at(K.textX, K.y + i * K.rowH + 1.2) %>;font-size:<%= pt(K.size) %>"><%= text %></div>
     <% }) %>
-    <div class="abs" data-ag-note <%= hasAG ? '' : 'hidden' %> style="<%= at(L.left, K.y + codes.length * K.rowH + 8) %>;font-size:<%= pt(7) %>;color:#444">AG = vom Arbeitgeber erfasst bzw. korrigiert</div>
+    <div class="abs" data-ag-note <%= hasAG ? '' : 'hidden' %> style="<%= at(L.left, K.y + codes.length * K.rowH + 8) %>;font-size:<%= pt(7) %>;color:#444">AG: vom Arbeitgeber eingetragen oder korrigiert</div>
   </div>
 </div>

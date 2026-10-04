@@ -46,7 +46,7 @@ export default function ownerRoutes({ store, config }) {
     const password = String(req.body.passwort ?? '');
     let error = null;
     if (!name) error = 'Bitte einen Namen angeben.';
-    else if (!/^[\w.@-]{3,40}$/.test(username)) error = 'Der Benutzername darf nur Buchstaben, Zahlen sowie . _ - @ enthalten (3–40 Zeichen).';
+    else if (!/^[\w.@-]{3,40}$/.test(username)) error = 'Der Benutzername darf nur Buchstaben, Zahlen sowie . _ - @ enthalten (3 bis 40 Zeichen).';
     else if (await store.getUserByUsername(username)) error = 'Dieser Benutzername ist bereits vergeben.';
     else error = passwordProblem(password);
     if (error) return renderPanel(res, { values: { name, username, password }, error, status: 400 });
@@ -55,8 +55,9 @@ export default function ownerRoutes({ store, config }) {
       username, passwordHash: await hashPassword(password), role: 'admin', name, onRoster: false, mustChangePassword: true,
     });
     await req.flash('success', `Chef-Zugang für ${name} angelegt.`, [
-      `Zugangsdaten für die erste Anmeldung – Benutzername: ${username} · Passwort: ${password}`,
-      'Beim ersten Login vergibt der neue Chef ein eigenes Passwort.',
+      `Benutzername: ${username}`,
+      `Startpasswort: ${password}`,
+      'Bei der ersten Anmeldung legt der Chef ein eigenes Passwort fest.',
     ]);
     back(res);
   });
@@ -136,7 +137,8 @@ export default function ownerRoutes({ store, config }) {
     await store.updateUser(req.target.id, { password_hash: await hashPassword(password), must_change_password: 1 });
     await store.deleteUserSessions(req.target.id, req.target.id === req.user.id ? req.session.id_hash : '');
     await req.flash('success', `Neues Startpasswort für ${req.target.name} gesetzt.`, [
-      `Benutzername: ${req.target.username} · Passwort: ${password}`,
+      `Benutzername: ${req.target.username}`,
+      `Startpasswort: ${password}`,
     ]);
     back(res);
   });
@@ -158,7 +160,7 @@ export default function ownerRoutes({ store, config }) {
     if (await store.userHasRecords(req.target.id)) {
       await store.updateUser(req.target.id, { active: 0 });
       await store.deleteUserSessions(req.target.id);
-      await req.flash('info', `${req.target.name} hat bereits Einträge bzw. Unterschriften im Heft und wurde deshalb nur deaktiviert (Aufbewahrungspflicht).`);
+      await req.flash('info', `${req.target.name} hat schon Einträge im Heft und wurde deshalb nur deaktiviert. Die Stundenzettel müssen aufbewahrt werden.`);
       return back(res);
     }
     await store.deleteUser(req.target.id);

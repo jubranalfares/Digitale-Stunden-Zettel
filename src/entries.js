@@ -45,7 +45,7 @@ export async function saveEntry(store, { actor, employee, input, today }) {
 
   const selfService = actor.id === employee.id;
   if (selfService && !employee.signature_id) {
-    throw new InputError('Bitte zuerst unter „Einstellungen“ unterschreiben – danach wird die Unterschrift automatisch gesetzt.');
+    throw new InputError('Bitte unterschreiben Sie zuerst unter „Einstellungen“. Danach wird Ihre Unterschrift automatisch gesetzt.');
   }
 
   let workMinutes = 0;

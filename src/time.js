@@ -85,7 +85,7 @@ export function computeWorkMinutes(start, end, breakMinutes) {
   if (gross < 0) gross += 24 * 60;
   const net = gross - breakMinutes;
   if (net <= 0) throw new InputError('Die Pause ist länger als die Anwesenheitszeit.');
-  if (net > MAX_WORK_MINUTES) throw new InputError('Mehr als 16 Stunden an einem Tag? Bitte Beginn und Ende prüfen.');
+  if (net > MAX_WORK_MINUTES) throw new InputError('Das wären mehr als 16 Stunden an einem Tag. Stimmen Beginn und Ende?');
   return net;
 }
 

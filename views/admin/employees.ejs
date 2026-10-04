@@ -14,7 +14,7 @@
               <% if (!u.active) { %> <span class="chip">inaktiv</span><% } %>
             </td>
             <td><%= u.username %></td>
-            <td><% if (u.role === 'admin') { %>–<% } else if (u.signature_id) { %><span class="chip chip-ok">✓</span><% } else { %><span class="chip chip-warn">noch nicht angemeldet</span><% } %></td>
+            <td><% if (u.role === 'admin') { %><% } else if (u.signature_id) { %><span class="chip chip-ok">✓</span><% } else { %><span class="chip chip-warn">noch nicht angemeldet</span><% } %></td>
             <td class="actions"><a class="btn btn-small" href="/admin/mitarbeiter/<%= u.id %>">Bearbeiten</a></td>
           </tr>
         <% }) %>
@@ -33,6 +33,6 @@
     <label>Startpasswort <input name="passwort" value="<%= suggestedPassword %>" minlength="8" required autocomplete="off"></label>
     <div class="form-actions" style="align-self:end;margin:0"><button class="btn btn-primary" type="submit">Anlegen</button></div>
   </form>
-  <p class="muted small" style="margin:12px 0 0">Bei der ersten Anmeldung vergibt der Mitarbeiter ein eigenes Passwort und unterschreibt einmal.</p>
+  <p class="muted small" style="margin:12px 0 0">Bei der ersten Anmeldung legt der Mitarbeiter ein eigenes Passwort fest und unterschreibt einmal.</p>
 </div>
 <%- include('../partials/footer') %>

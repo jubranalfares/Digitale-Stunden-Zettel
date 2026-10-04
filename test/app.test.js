@@ -416,7 +416,7 @@ test('Inhaber sieht, wo die Daten liegen', async () => {
   const page = await chef.get('/inhaber');
   assert.match(page.data, /id="system"/);
   assert.match(page.data, /lokale Datei/);
-  assert.match(page.data, /\d+ Zugänge · \d+ Tageseinträge/);
+  assert.match(page.data, /\d+ Zugänge, \d+ Tageseinträge/);
 });
 
 test('Update-eigene Vercel-Adressen leiten auf die feste Adresse um', async () => {

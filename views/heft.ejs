@@ -9,7 +9,7 @@
 
   <% if (signatureMissing) { %>
     <div class="flash flash-warning banner">
-      <span>Bitte einmal unterschreiben – danach setzt das System Ihre Unterschrift automatisch.</span>
+      <span>Ihre Unterschrift fehlt noch. Einmal unterschreiben reicht, danach setzt die App sie von selbst.</span>
       <a class="btn btn-small" href="/einstellungen#unterschrift">Unterschreiben</a>
     </div>
   <% } %>
@@ -27,12 +27,12 @@
   </nav>
 
   <% if (kind === 'sheet') { %>
-    <p class="heft-hint">👆 <strong>Auf einen Tag tippen</strong>, Beginn und Ende wählen, speichern. Dauer, Summe und Unterschrift setzt das System.</p>
+    <p class="heft-hint">Tippen Sie auf einen Tag, um die Zeiten einzutragen.</p>
     <div class="paper-scroll" data-scroll>
       <%- include('partials/datev-paper', { sheet, interactive: true, editable }) %>
     </div>
   <% } else { %>
-    <p class="heft-hint">👆 <strong>Auf einen Tag <%= isAdmin ? 'in der Spalte eines Mitarbeiters' : 'in Ihrer Spalte' %> tippen</strong>, Beginn und Ende wählen, speichern. Stunden, Summe und Unterschrift setzt das System.</p>
+    <p class="heft-hint"><%= isAdmin ? 'Tippen Sie in der Spalte eines Mitarbeiters auf einen Tag, um Zeiten einzutragen.' : 'Tippen Sie in Ihrer Spalte auf einen Tag, um Ihre Zeiten einzutragen.' %></p>
     <% roster.pages.forEach((columns, pageIndex) => { %>
       <div class="paper-scroll roster-scroll" data-scroll>
         <%- include('partials/roster-paper', {

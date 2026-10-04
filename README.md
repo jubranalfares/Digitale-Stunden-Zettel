@@ -22,17 +22,17 @@ nur ohne Rechnen und ohne ständiges Unterschreiben:
 
 ## So schreibt man ins Heft
 
-1. Tag antippen (im Stundenzettel die Zeile, in der Einsatzliste die Zelle).
-2. **Beginn**: Stunde antippen, dann Minuten (in 5-Minuten-Schritten). Danach geht es automatisch mit
-   dem **Ende** weiter.
-3. Optional **Pause** (keine, 15, 30, 45, 60, 90 min) und **Kürzel** (K, U, UU, F, SA, SU) antippen.
-4. **Speichern** – das Fenster schließt sich, der Tag leuchtet kurz grün auf und unten erscheint
-   „✓ Gespeichert – 4,00 h · Monat …“.
+1. Auf einen Tag tippen (im Stundenzettel die Zeile, in der Einsatzliste die Zelle).
+2. Beginn wählen: erst die Stunde, dann die Minuten (:00, :15, :30, :45). Danach geht es von selbst
+   mit dem Ende weiter.
+3. Auf Speichern tippen. Das Fenster schließt sich, der Tag leuchtet kurz grün auf und unten steht,
+   wie viele Stunden es waren.
 
-Stunden stehen überall als Dezimalzahl mit Komma (z. B. **4,50 h** = 4 Std. 30 Min.), Pausen in Minuten.
-„Aufgezeichnet am“ ist der Kalendertag des Eintrags; neben den Unterschriften steht der letzte Tag des
-Monats. Mehr als 16 Stunden an einem Tag lehnt das System als Tippfehler ab. Ein Eintrag lässt sich im
-Fenster über **Löschen** entfernen.
+Stunden stehen überall als Dezimalzahl mit Komma, zum Beispiel 4,50 h für 4 Std. 30 Min. In der
+Einsatzliste steht pro Tag nur die Unterschrift, die Stunden zählt die Zeile Summe. „Aufgezeichnet am“
+ist der Kalendertag des Eintrags, neben den Unterschriften steht der letzte Tag des Monats. Mehr als
+16 Stunden an einem Tag lehnt die App als Tippfehler ab. Pause, Kürzel und Bemerkung werden nicht
+mehr erfasst. Ein Eintrag lässt sich im Fenster über Löschen entfernen.
 
 Mitarbeiter schreiben in ihren eigenen Zettel und ihre eigene Spalte der Einsatzliste (laufender und
 Vormonat). Der Chef kann überall eintragen; seine Einträge werden mit **„AG“** gekennzeichnet.

@@ -9,6 +9,8 @@
   <script src="<%= asset('js/theme.js') %>"></script>
   <link rel="stylesheet" href="<%= asset('css/app.css') %>">
   <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-title" content="Stundenzettel">
   <link rel="manifest" href="/static/manifest.webmanifest">
 </head>
 <body>
@@ -17,7 +19,7 @@
 %>
 <header class="topbar">
   <a class="brand" href="/">
-    <span class="brand-mark" aria-hidden="true">⏱</span>
+    <span class="brand-mark"><%- include('logo') %></span>
     <span>Stundenzettel<small><%= settings.company_name %></small></span>
   </a>
   <nav aria-label="Hauptnavigation">

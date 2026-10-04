@@ -2,7 +2,7 @@
 <div class="page-head">
   <div>
     <h1>Inhaber-Bereich</h1>
-    <div class="sub">Chef-Zugänge anlegen oder entfernen und Rollen verteilen. Diesen Bereich sehen nur Inhaber.</div>
+    <div class="sub">Hier legen Sie Zugänge für die Chefs an, entfernen sie oder ändern Rollen. Diesen Bereich sehen nur Inhaber.</div>
   </div>
 </div>
 
@@ -70,20 +70,20 @@
       </li>
     <% }) %>
   </ul>
-  <p class="muted small" style="margin-top:12px">Beim Anlegen und beim Zurücksetzen wird dieses Startpasswort verwendet: <code><%= suggestedPassword %></code>. Notieren und weitergeben; beim nächsten Seitenaufruf wird ein neues vorgeschlagen.</p>
+  <p class="muted small" style="margin-top:12px">Beim Anlegen und Zurücksetzen gilt dieses Startpasswort: <code><%= suggestedPassword %></code>. Schreiben Sie es auf und geben Sie es weiter. Beim nächsten Aufruf der Seite wird ein neues vorgeschlagen.</p>
 </div>
 
 <div class="card" id="system">
   <h2>System</h2>
-  <p class="muted small">Alle Daten liegen in der Online-Datenbank. Updates der App ändern daran nichts – diese Angaben bleiben nach jedem Update gleich (bis auf die Version).</p>
+  <p class="muted small">Alle Daten liegen in der Online-Datenbank. Updates der App ändern daran nichts. Bis auf die Version bleiben diese Angaben nach jedem Update gleich.</p>
   <dl class="facts">
     <dt>Datenbank</dt><dd><% if (!locals.dbIsTemporary && system.database !== 'lokale Datei') { %><span class="chip chip-ok">✓ fest</span> <% } %><code><%= system.database %></code><% if (system.variable) { %> <span class="muted small">(<%= system.variable %>)</span><% } %></dd>
-    <dt>Gespeichert</dt><dd><%= system.users %> Zugänge · <%= system.entries %> Tageseinträge<% if (system.lastEntry) { %> · letzter Tag <%= formatDateDE(system.lastEntry) %><% } %></dd>
+    <dt>Gespeichert</dt><dd><%= system.users %> Zugänge, <%= system.entries %> Tageseinträge<% if (system.lastEntry) { %>, letzter Tag <%= formatDateDE(system.lastEntry) %><% } %></dd>
     <% if (system.productionHost) { %><dt>Feste Adresse</dt><dd><a href="https://<%= system.productionHost %>">https://<%= system.productionHost %></a></dd><% } %>
     <% if (system.version) { %><dt>Version</dt><dd><code><%= system.version %></code></dd><% } %>
     <% if (system.variables.length > 1) { %>
       <dt>Variablen</dt>
-      <dd class="small"><% system.variables.forEach((v) => { %><div><code><%= v.name %></code><% if (v.host) { %> → <%= v.host %><% } %></div><% }) %></dd>
+      <dd class="small"><% system.variables.forEach((v) => { %><div><code><%= v.name %></code><% if (v.host) { %>: <%= v.host %><% } %></div><% }) %></dd>
     <% } %>
   </dl>
 </div>

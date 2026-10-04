@@ -3,7 +3,6 @@
   'use strict';
 
   const pad = (n) => String(n).padStart(2, '0');
-  const fmt = (min) => `${Math.floor(min / 60)}:${pad(min % 60)}`;
   const parseClock = (v) => {
     const m = /^(\d{1,2}):(\d{2})/.exec(v || '');
     return m ? Number(m[1]) * 60 + Number(m[2]) : null;
@@ -190,14 +189,14 @@
     });
   });
 
-  // ---- Heft: Tag antippen, im Eingabefenster erfassen ------------------------
+  // ---- Heft: Tag antippen, Beginn und Ende wählen ------------------------------
 
-  // 270 → "4,50 h" (Stunden als Menge, nicht als Uhrzeit)
+  // 270 Minuten → "4,50 h" (Stunden als Menge, nicht als Uhrzeit)
   const hoursText = (min) => `${(min / 60).toFixed(2).replace('.', ',')} h`;
   const hoursWords = (min) => `${Math.floor(min / 60)} Std.${min % 60 ? ` ${min % 60} Min.` : ''}`;
   const MAX_WORK = 16 * 60;
   const dayLabel = (iso) => new Date(`${iso}T12:00:00`).toLocaleDateString('de-DE', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+    weekday: 'long', day: 'numeric', month: 'long',
   });
 
   const heft = document.querySelector('[data-heft]');
@@ -223,12 +222,12 @@
           redirect: 'manual',
         });
       } catch {
-        throw new Error('Keine Verbindung – bitte gleich noch einmal versuchen.');
+        throw new Error('Keine Verbindung. Bitte versuchen Sie es gleich noch einmal.');
       }
       let data = null;
       try { data = await res.json(); } catch { /* keine JSON-Antwort */ }
-      if (!data) throw new Error('Sitzung abgelaufen – bitte die Seite neu laden.');
-      if (!res.ok) throw new Error(data.error || 'Speichern fehlgeschlagen.');
+      if (!data) throw new Error('Sie wurden abgemeldet. Bitte laden Sie die Seite neu.');
+      if (!res.ok) throw new Error(data.error || 'Das hat leider nicht geklappt.');
       return data;
     };
 
@@ -244,11 +243,11 @@
     // ---- Eingabefenster
     const $ = (sel) => dialog.querySelector(sel);
     const form = $('[data-entry-form]');
-    const remarksInput = $('[data-remarks]');
     const saveBtn = $('[data-entry-save]');
     const deleteBtn = $('[data-entry-delete]');
     const errorEl = $('[data-entry-error]');
-    const pauseChips = $('[data-pause-chips]');
+    const minutesRow = $('[data-minutes]');
+    const QUESTIONS = { start: 'Wann ging es los?', end: 'Wann war Schluss?' };
     let target = null; // Zeile bzw. Zelle, die gerade bearbeitet wird
     let state = null;
     let busy = false;
@@ -260,85 +259,65 @@
     };
     const minutesOf = (t) => t.h * 60 + t.m;
 
-    // Arbeitszeit wie auf dem Server: Ende vor Beginn = über Mitternacht.
+    // Arbeitszeit wie auf dem Server: Ende vor Beginn heißt über Mitternacht.
     function work() {
       if (!state.start || !state.end) return null;
       let gross = minutesOf(state.end) - minutesOf(state.start);
       if (gross === 0) return { error: 'Beginn und Ende sind gleich.' };
       const overnight = gross < 0;
       if (overnight) gross += 24 * 60;
-      const net = gross - state.pause;
-      if (net <= 0) return { error: 'Die Pause ist länger als die Arbeitszeit.' };
-      if (net > MAX_WORK) return { error: 'Mehr als 16 Stunden? Bitte Beginn und Ende prüfen.' };
-      return { net, overnight };
+      if (gross > MAX_WORK) return { error: 'Das wären mehr als 16 Stunden. Stimmen Beginn und Ende?' };
+      return { net: gross, overnight };
     }
 
     function render() {
       for (const field of ['start', 'end']) {
-        $(`[data-tile-value="${field}"]`).textContent = timeOf(state[field]) || '––:––';
-        $(`[data-tile="${field}"]`).classList.toggle('active', state.step?.field === field);
+        $(`[data-tile-value="${field}"]`).textContent = timeOf(state[field]) || '--:--';
+        $(`[data-tile="${field}"]`).classList.toggle('active', state.field === field);
         $(`[data-tile="${field}"]`).classList.toggle('filled', !!state[field]);
       }
-      const picker = $('[data-picker]');
-      picker.hidden = !state.step;
-      if (state.step) {
-        const { field, part } = state.step;
-        const current = state[field];
-        const label = field === 'start' ? 'Beginn' : 'Ende';
-        $('[data-picker-head]').textContent = part === 'hour'
-          ? `${label}: Stunde wählen`
-          : `${label}: ${pad(current?.h ?? 0)}:__ – Minuten wählen`;
-        $('[data-grid="hour"]').hidden = part !== 'hour';
-        $('[data-grid="minute"]').hidden = part !== 'minute';
+
+      $('[data-picker]').hidden = !state.field;
+      if (state.field) {
+        const current = state[state.field];
+        $('[data-picker-head]').textContent = state.minutePending ? 'Und die Minuten?' : QUESTIONS[state.field];
+        minutesRow.classList.toggle('pending', !!state.minutePending);
         dialog.querySelectorAll('[data-hour]').forEach((b) => {
           b.classList.toggle('selected', current?.h === Number(b.dataset.hour));
         });
-        dialog.querySelectorAll('[data-minute]').forEach((b) => {
-          b.classList.toggle('selected', part === 'minute' && current?.m === Number(b.dataset.minute));
+        // Alte Einträge mit krummen Minuten (z. B. 12:10) bekommen einen eigenen Knopf.
+        minutesRow.querySelector('[data-extra]')?.remove();
+        if (current && current.m % 15) {
+          const extra = Object.assign(document.createElement('button'), { type: 'button', textContent: `:${pad(current.m)}` });
+          extra.dataset.minute = current.m;
+          extra.dataset.extra = '';
+          minutesRow.append(extra);
+        }
+        minutesRow.querySelectorAll('[data-minute]').forEach((b) => {
+          b.classList.toggle('selected', !!current && !state.minutePending && current.m === Number(b.dataset.minute));
+          b.disabled = !current;
         });
       }
-      $('[data-clear-times]').hidden = !(state.start || state.end);
 
-      // Pause: eine ungewöhnliche alte Pause (z. B. 20 min) bekommt einen eigenen Knopf.
-      pauseChips.querySelector('[data-extra]')?.remove();
-      if (![...pauseChips.querySelectorAll('[data-pause]')].some((b) => Number(b.dataset.pause) === state.pause)) {
-        const extra = Object.assign(document.createElement('button'), {
-          type: 'button', className: 'chip-btn', textContent: `${state.pause} min`,
-        });
-        extra.dataset.pause = state.pause;
-        extra.dataset.extra = '';
-        pauseChips.append(extra);
-      }
-      pauseChips.querySelectorAll('[data-pause]').forEach((b) => {
-        b.setAttribute('aria-pressed', String(Number(b.dataset.pause) === state.pause));
-      });
-      dialog.querySelectorAll('[data-code]').forEach((b) => {
-        b.setAttribute('aria-pressed', String(b.dataset.code === state.code));
-      });
-
-      // Zusammenfassung und ob gespeichert werden kann
-      const summary = $('[data-entry-summary]');
+      const total = $('[data-entry-total]');
       const w = work();
-      let ok = false;
-      summary.className = 'entry-summary';
+      total.className = 'entry-total';
+      total.replaceChildren();
       if (w?.error) {
-        summary.textContent = w.error;
-        summary.classList.add('bad');
+        total.textContent = w.error;
+        total.classList.add('bad');
       } else if (w) {
-        summary.innerHTML = '';
-        summary.append('Arbeitszeit ', Object.assign(document.createElement('strong'), { textContent: hoursText(w.net) }));
-        summary.append(` = ${hoursWords(w.net)}${w.overnight ? ' (über Mitternacht)' : ''}`);
-        summary.classList.add('good');
-        ok = true;
-      } else if (state.start || state.end) {
-        summary.textContent = state.start ? 'Jetzt das Ende wählen.' : 'Jetzt den Beginn wählen.';
-      } else if (state.code || state.remarks.trim()) {
-        summary.textContent = state.code ? `Ganzer Tag: ${$(`[data-code="${state.code}"]`).dataset.label}` : 'Nur Bemerkung';
-        ok = true;
+        total.append(
+          Object.assign(document.createElement('span'), { textContent: 'Arbeitszeit' }),
+          Object.assign(document.createElement('strong'), { textContent: hoursText(w.net) }),
+          Object.assign(document.createElement('small'), { textContent: `${hoursWords(w.net)}${w.overnight ? ', über Mitternacht' : ''}` }),
+        );
+        total.classList.add('good');
       } else {
-        summary.textContent = 'Beginn und Ende wählen.';
+        total.textContent = state.minutePending ? 'Jetzt die Minuten antippen.'
+          : state.start ? 'Jetzt noch das Ende.' : 'Erst die Stunde, dann die Minuten.';
       }
-      saveBtn.disabled = !ok || busy;
+      saveBtn.disabled = !(w && !w.error) || busy;
       deleteBtn.hidden = !state.exists;
     }
 
@@ -349,14 +328,11 @@
         exists: !!(d.start || d.code || d.remarks),
         start: toTime(d.start),
         end: toTime(d.end),
-        pause: Number(d.pause) || 0,
-        code: d.code || '',
-        remarks: d.remarks || '',
-        step: null,
+        field: null,
+        minutePending: false,
       };
-      // Leerer Tag: gleich mit der Stunde für den Beginn anfangen.
-      if (!state.start) state.step = { field: 'start', part: 'hour' };
-      remarksInput.value = state.remarks;
+      // Leerer Tag: gleich mit dem Beginn anfangen. Bestehender Tag: erst einmal nur anzeigen.
+      if (!state.start) state.field = 'start';
       errorEl.hidden = true;
       $('[data-entry-title]').textContent = dayLabel(d.date);
       $('[data-entry-name]').textContent = d.name || '';
@@ -370,30 +346,22 @@
     };
 
     dialog.addEventListener('click', (e) => {
-      if (e.target === dialog) return close(); // Tipp neben das Fenster
+      if (e.target === dialog) return close(); // neben das Fenster getippt
       const btn = e.target.closest('button');
       if (!btn || !state) return;
       if (btn.matches('[data-entry-close]')) return close();
       if (btn.dataset.tile) {
-        state.step = { field: btn.dataset.tile, part: 'hour' };
+        state.field = btn.dataset.tile;
+        state.minutePending = false;
       } else if (btn.dataset.hour) {
-        const { field } = state.step;
-        state[field] = { h: Number(btn.dataset.hour), m: state[field]?.m ?? 0 };
-        state.step = { field, part: 'minute' };
+        state[state.field] = { h: Number(btn.dataset.hour), m: state[state.field]?.m ?? 0 };
+        state.minutePending = true;
       } else if (btn.dataset.minute) {
-        const { field } = state.step;
-        state[field] = { h: state[field]?.h ?? 0, m: Number(btn.dataset.minute) };
-        // Nach dem Beginn geht es mit dem Ende weiter; danach ist die Auswahl fertig.
-        state.step = field === 'start' && !state.end ? { field: 'end', part: 'hour' } : null;
-      } else if (btn.dataset.pause) {
-        state.pause = Number(btn.dataset.pause);
-      } else if (btn.dataset.code) {
-        state.code = state.code === btn.dataset.code ? '' : btn.dataset.code;
-      } else if (btn.matches('[data-clear-times]')) {
-        state.start = null;
-        state.end = null;
-        state.pause = 0;
-        state.step = { field: 'start', part: 'hour' };
+        const { field } = state;
+        state.minutePending = false;
+        state[field] = { h: state[field].h, m: Number(btn.dataset.minute) };
+        // Nach dem Beginn geht es mit dem Ende weiter, danach ist die Auswahl fertig.
+        state.field = field === 'start' && !state.end ? 'end' : null;
       } else if (btn.matches('[data-entry-delete]')) {
         if (window.confirm(`Eintrag vom ${dayLabel(target.dataset.date)} löschen?`)) {
           save({ beginn: '', ende: '', pause: '', kuerzel: '', bemerkung: '' });
@@ -405,21 +373,11 @@
       render();
     });
 
-    remarksInput.addEventListener('input', () => {
-      state.remarks = remarksInput.value;
-      render();
-    });
-
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       if (saveBtn.disabled) return;
-      save({
-        beginn: timeOf(state.start),
-        ende: timeOf(state.end),
-        pause: state.start && state.pause ? fmt(state.pause) : '',
-        kuerzel: state.code,
-        bemerkung: state.remarks.trim(),
-      });
+      // Pause, Kürzel und Bemerkung werden nicht mehr genutzt und beim Speichern geleert.
+      save({ beginn: timeOf(state.start), ende: timeOf(state.end), pause: '', kuerzel: '', bemerkung: '' });
     });
 
     // Gespeicherten Tag im Formular anzeigen.
@@ -428,7 +386,6 @@
       Object.assign(el.dataset, {
         start: entry?.start ?? '',
         end: entry?.end ?? '',
-        pause: entry?.breakMinutes ?? 0,
         code: entry?.code ?? '',
         remarks: entry?.remarks ?? '',
       });
@@ -465,8 +422,8 @@
         showSaved(target, data);
         close();
         toast(data.entry
-          ? `✓ Gespeichert${data.day ? ` – ${data.day}` : ''} · Monat ${data.total || '0,00\u00a0h'}`
-          : '✓ Eintrag gelöscht');
+          ? `Gespeichert: ${data.day}. Diesen Monat ${data.total || '0,00 h'}.`
+          : 'Eintrag gelöscht.');
       } catch (err) {
         errorEl.textContent = err.message;
         errorEl.hidden = false;
@@ -477,26 +434,19 @@
       }
     }
 
-    // Tag antippen (die ganze Zeile bzw. Zelle ist die Fläche)
+    // Tag antippen: die ganze Zeile bzw. Zelle ist die Fläche.
     heft.addEventListener('click', (e) => {
       const el = e.target.closest('[data-entry]');
       if (el && !e.target.closest('a')) open(el);
     });
 
-    // ---- Einsatzliste: Tageszelle neu zeichnen
+    // ---- Einsatzliste: Tageszelle neu zeichnen (nur Unterschrift, keine Stunden)
     function renderCell(view, cell) {
       view.replaceChildren();
       if (!cell) return;
-      const text = document.createElement('div');
-      text.className = 'rc-text';
-      text.style.fontSize = `calc(var(--pt) * ${cell.duration ? 8.5 : 9})`;
-      if (cell.duration) text.append(Object.assign(document.createElement('span'), { textContent: cell.duration }));
-      if (cell.code) {
-        text.append(Object.assign(document.createElement('span'), {
-          className: `rc-code ${cell.duration ? '' : 'only'}`, textContent: cell.code,
-        }));
+      if (cell.code && !cell.duration) {
+        view.append(Object.assign(document.createElement('span'), { className: 'rc-code', textContent: cell.code }));
       }
-      view.append(text);
       if (cell.signatureId) {
         view.append(Object.assign(document.createElement('img'), { src: `/signatur/${cell.signatureId}.png`, alt: 'Unterschrift' }));
       } else if (cell.ag) {

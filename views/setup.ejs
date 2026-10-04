@@ -2,13 +2,13 @@
 <div class="auth-wrap">
   <div class="card auth-card wide">
     <div class="auth-brand">
-      <span class="brand-mark" aria-hidden="true">⏱</span>
+      <span class="brand-mark"><%- include('partials/logo') %></span>
       <div><strong>Digitale Stundenzettel</strong><span>Ersteinrichtung</span></div>
     </div>
-    <h1>Willkommen! Zuerst den Inhaber-Zugang anlegen</h1>
-    <p class="muted">Wer die Einrichtung macht, wird <strong>Inhaber</strong> (Betreiber der App): sieht alle Stundenzettel, legt danach unter „Inhaber“ die Chef-Zugänge und unter „Mitarbeiter“ die Mitarbeiter an und exportiert die PDFs für den Steuerberater.</p>
+    <h1>Willkommen! Zuerst brauchen wir Ihren Zugang.</h1>
+    <p class="muted">Wer die App einrichtet, wird <strong>Inhaber</strong>. Als Inhaber sehen Sie alle Stundenzettel, legen die Zugänge für Chefs und Mitarbeiter an und laden das PDF für den Steuerberater herunter.</p>
     <% if (locals.dbIsTemporary) { %><%- include('partials/db-temporary') %><% } else if (locals.dbInfo && dbInfo.host !== 'lokale Datei') { %>
-      <div class="flash flash-success">✓ Feste Datenbank verbunden (<code><%= dbInfo.host.split('.')[0] %></code>) – die Daten bleiben auch nach Updates erhalten.</div>
+      <div class="flash flash-success">Die Datenbank ist richtig verbunden (<code><%= dbInfo.host.split('.')[0] %></code>). Ihre Daten bleiben auch nach Updates erhalten.</div>
     <% } %>
     <% if (error) { %><div class="flash flash-error" role="alert"><%= error %></div><% } %>
     <form method="post" action="/setup" class="form-grid">
@@ -41,7 +41,7 @@
           <dt>Variablen</dt>
           <dd>
             <% if (!dbInfo.variables.length) { %>keine<% } %>
-            <% dbInfo.variables.forEach((v) => { %><div><code><%= v.name %></code><% if (v.host) { %> → <%= v.host %><% } %></div><% }) %>
+            <% dbInfo.variables.forEach((v) => { %><div><code><%= v.name %></code><% if (v.host) { %>: <%= v.host %><% } %></div><% }) %>
           </dd>
         </dl>
       </details>

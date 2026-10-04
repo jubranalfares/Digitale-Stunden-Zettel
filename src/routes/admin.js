@@ -29,7 +29,7 @@ export default function adminRoutes({ store }) {
 
   const userFormProblem = async (values, excludeId = null) => {
     if (!values.name) return 'Bitte einen Namen angeben.';
-    if (!/^[\w.@-]{3,40}$/.test(values.username)) return 'Der Benutzername darf nur Buchstaben, Zahlen sowie . _ - @ enthalten (3–40 Zeichen).';
+    if (!/^[\w.@-]{3,40}$/.test(values.username)) return 'Der Benutzername darf nur Buchstaben, Zahlen sowie . _ - @ enthalten (3 bis 40 Zeichen).';
     const existing = await store.getUserByUsername(values.username);
     if (existing && existing.id !== excludeId) return 'Dieser Benutzername ist bereits vergeben.';
     return null;
@@ -60,8 +60,9 @@ export default function adminRoutes({ store }) {
       mustChangePassword: true,
     });
     await req.flash('success', `${values.name} wurde angelegt.`, [
-      `Zugangsdaten für die erste Anmeldung – Benutzername: ${values.username} · Passwort: ${password}`,
-      'Bei der ersten Anmeldung wird ein eigenes Passwort vergeben und einmal unterschrieben.',
+      `Benutzername: ${values.username}`,
+      `Startpasswort: ${password}`,
+      'Bei der ersten Anmeldung legt der Mitarbeiter ein eigenes Passwort fest und unterschreibt einmal.',
     ]);
     res.redirect('/admin/mitarbeiter');
   });
@@ -109,8 +110,9 @@ export default function adminRoutes({ store }) {
     await store.updateUser(req.target.id, { password_hash: await hashPassword(password), must_change_password: 1 });
     await store.deleteUserSessions(req.target.id, req.target.id === req.user.id ? req.session.id_hash : '');
     await req.flash('success', 'Neues Startpasswort gesetzt.', [
-      `Benutzername: ${req.target.username} · Passwort: ${password}`,
-      'Bei der nächsten Anmeldung muss ein eigenes Passwort vergeben werden.',
+      `Benutzername: ${req.target.username}`,
+      `Startpasswort: ${password}`,
+      'Bei der nächsten Anmeldung wird ein eigenes Passwort festgelegt.',
     ]);
     res.redirect(`/admin/mitarbeiter/${req.target.id}`);
   });
