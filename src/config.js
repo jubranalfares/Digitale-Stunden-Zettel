@@ -21,6 +21,23 @@ function findDatabase(env) {
   return { url: env[urlKey], token: tokenKey ? env[tokenKey] : undefined, variable: urlKey };
 }
 
+// Für die Fehlersuche: Datenbank-Variablen mit Namen und – bei Adressen – nur dem Servernamen. Nie Schlüssel.
+export function databaseOverview(env = process.env) {
+  return Object.keys(env).filter((k) => /TURSO|LIBSQL|DATABASE/.test(k)).sort().map((name) => {
+    let host = '';
+    if (isDbUrl(env[name])) {
+      try { host = new URL(env[name]).host; } catch { /* kein gültiger Wert */ }
+    }
+    return { name, host };
+  });
+}
+
+// Servername der verwendeten Datenbank (ohne Zugangsdaten).
+export function databaseHost(dbUrl) {
+  if (!dbUrl || dbUrl.startsWith('file:')) return 'lokale Datei';
+  try { return new URL(dbUrl).host; } catch { return 'unbekannt'; }
+}
+
 // Namen (nie Werte!) von Variablen, die nach Datenbank aussehen – hilft bei der Einrichtung.
 export function databaseVariableNames(env = process.env) {
   return Object.keys(env).filter((k) => /TURSO|LIBSQL|DATABASE/.test(k)).sort();

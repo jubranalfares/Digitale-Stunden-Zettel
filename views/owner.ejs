@@ -81,6 +81,10 @@
     <dt>Gespeichert</dt><dd><%= system.users %> Zugänge · <%= system.entries %> Tageseinträge<% if (system.lastEntry) { %> · letzter Tag <%= formatDateDE(system.lastEntry) %><% } %></dd>
     <% if (system.productionHost) { %><dt>Feste Adresse</dt><dd><a href="https://<%= system.productionHost %>">https://<%= system.productionHost %></a></dd><% } %>
     <% if (system.version) { %><dt>Version</dt><dd><code><%= system.version %></code></dd><% } %>
+    <% if (system.variables.length > 1) { %>
+      <dt>Variablen</dt>
+      <dd class="small"><% system.variables.forEach((v) => { %><div><code><%= v.name %></code><% if (v.host) { %> → <%= v.host %><% } %></div><% }) %></dd>
+    <% } %>
   </dl>
 </div>
 <%- include('partials/footer') %>

@@ -80,6 +80,7 @@ const day = (iso) => ({ datum: iso, beginn: '', pause: '', ende: '', kuerzel: ''
 
 test('Ersteinrichtung legt den Chef an', async () => {
   assert.equal((await chef.get('/')).location, '/setup');
+  assert.match((await chef.get('/setup')).data, /Technische Angaben/);
   const res = await chef.post('/setup', {
     firma: 'Eiscafé Taormina', name: 'Chef', benutzername: 'chef', passwort: 'geheim123', passwort2: 'geheim123',
   });

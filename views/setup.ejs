@@ -29,6 +29,20 @@
       </div>
     </form>
 
+    <% if (locals.dbInfo) { %>
+      <details class="tech-info">
+        <summary>Technische Angaben (für den Entwickler)</summary>
+        <dl class="facts small">
+          <dt>Datenbank</dt><dd><code><%= dbInfo.host %></code><% if (dbInfo.variable) { %> aus <code><%= dbInfo.variable %></code><% } %></dd>
+          <% if (dbInfo.version) { %><dt>Version</dt><dd><code><%= dbInfo.version %></code></dd><% } %>
+          <dt>Variablen</dt>
+          <dd>
+            <% if (!dbInfo.variables.length) { %>keine<% } %>
+            <% dbInfo.variables.forEach((v) => { %><div><code><%= v.name %></code><% if (v.host) { %> → <%= v.host %><% } %></div><% }) %>
+          </dd>
+        </dl>
+      </details>
+    <% } %>
   </div>
 </div>
 <%- include('partials/footer') %>

@@ -2,6 +2,7 @@ import express from 'express';
 import {
   LoginThrottle, endSession, hashPassword, passwordProblem, requireLogin, startSession, verifyPassword,
 } from '../auth.js';
+import { databaseHost, databaseOverview } from '../config.js';
 import { validImageDataUrl } from '../http.js';
 
 export default function authRoutes({ store, config }) {
@@ -16,9 +17,14 @@ export default function authRoutes({ store, config }) {
 
   // ---- Ersteinrichtung (nur solange es noch keinen Benutzer gibt) -----------
 
+  // Solange noch niemand eingerichtet ist: anzeigen, mit welcher Datenbank die App verbunden ist.
+  const dbInfo = () => ({
+    host: databaseHost(config.dbUrl), variable: config.dbVariable, version: config.version, variables: databaseOverview(),
+  });
+
   router.get('/setup', async (req, res) => {
     if (await store.countUsers()) return res.redirect('/login');
-    res.render('setup', { title: 'Ersteinrichtung', values: {}, error: null });
+    res.render('setup', { title: 'Ersteinrichtung', values: {}, error: null, dbInfo: dbInfo() });
   });
 
   router.post('/setup', async (req, res) => {
@@ -34,7 +40,7 @@ export default function authRoutes({ store, config }) {
     else if (!/^[\w.@-]{3,40}$/.test(values.username)) error = 'Der Benutzername darf nur Buchstaben, Zahlen sowie . _ - @ enthalten (3–40 Zeichen).';
     else if (password !== String(req.body.passwort2 ?? '')) error = 'Die Passwörter stimmen nicht überein.';
     else error = passwordProblem(password);
-    if (error) return res.status(400).render('setup', { title: 'Ersteinrichtung', values, error });
+    if (error) return res.status(400).render('setup', { title: 'Ersteinrichtung', values, error, dbInfo: dbInfo() });
 
     await store.setSetting('company_name', values.company);
     // Der erste Zugang ist der Inhaber (Betreiber): darf später Chef-Zugänge anlegen und Rollen verteilen.

@@ -2,15 +2,19 @@
 // Inhaber ist der erste angelegte Zugang; weitere Inhaber kann ein Inhaber ernennen.
 // Für alle anderen existiert dieser Bereich nicht (404).
 import express from 'express';
+import { databaseHost, databaseOverview } from '../config.js';
 import { generatePassword, hashPassword, passwordProblem, requireLogin, requireOwner } from '../auth.js';
 
 // Wo liegen die Daten? Hilft zu prüfen, dass nach Updates dieselbe Datenbank verwendet wird.
 function systemInfo(config, counts) {
-  let database = 'lokale Datei';
-  try {
-    if (!config.dbUrl.startsWith('file:')) database = new URL(config.dbUrl).host;
-  } catch { /* unbekanntes Format */ }
-  return { database, variable: config.dbVariable, version: config.version, productionHost: config.productionHost, ...counts };
+  return {
+    database: databaseHost(config.dbUrl),
+    variable: config.dbVariable,
+    variables: databaseOverview(),
+    version: config.version,
+    productionHost: config.productionHost,
+    ...counts,
+  };
 }
 
 export default function ownerRoutes({ store, config }) {
