@@ -239,7 +239,7 @@ input[type="checkbox"] { display: inline-block; width: 20px; min-height: 20px; h
 
 /* ---- Anmeldung -------------------------------------------------------------- */
 
-.auth-wrap { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; }
+.auth-wrap { min-height: 100vh; display: grid; place-items: center; padding: 66px 16px 24px; } /* oben Platz für den Hell/Dunkel-Knopf */
 .auth-card { width: 100%; max-width: 420px; }
 .auth-card.wide { max-width: 640px; }
 .auth-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
