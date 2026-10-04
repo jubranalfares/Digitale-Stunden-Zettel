@@ -1,16 +1,19 @@
 <%#
   Nachbildung der Einsatzliste (alle Mitarbeiter, 8 pro Blatt). Maße: src/layout.js (ROSTER).
+  Mit canEditColumn/editable wird die Liste direkt beschreibbar ("12-16" in die Zelle tippen).
 %>
 <%
   const R = ROSTER;
   const T = R.table;
   const nameSize = (name) => (name.length > 13 ? 8 : T.nameSize);
-  const editable = (emp) => !!(emp && locals.editableIds && editableIds.includes(String(emp.id)));
+  const own = (emp) => !!(emp && locals.canEditColumn && canEditColumn(emp));
+  // Die eigene Spalte wird für Mitarbeiter leicht hervorgehoben
+  const ownClass = (emp) => (own(emp) && locals.viewer && viewer.role !== 'admin' ? 'own' : '');
   const showSignature = (emp) => !locals.viewer || viewer.role === 'admin' || viewer.id === emp.id;
   const pad2 = (n) => String(n).padStart(2, '0');
 %>
 <div class="paper-wrap">
-  <div class="paper roster" role="img" aria-label="<%= roster.title %>, <%= roster.monthLabel %>">
+  <div class="paper roster" <% if (!locals.canEditColumn) { %>role="img" aria-label="<%= roster.title %>, <%= roster.monthLabel %>"<% } %>>
     <div class="abs" style="<%= at(R.heading.x, R.heading.companyY) %>;font-size:<%= pt(R.heading.size) %>"><%= roster.company %></div>
     <div class="abs" style="<%= at(R.heading.x, R.heading.titleY) %>;font-size:<%= pt(R.heading.size) %>"><%= roster.title %></div>
     <div class="abs" style="<%= at(R.month.x, R.month.y) %>;font-size:<%= pt(R.month.size) %>"><%= R.month.label %>&nbsp; <%= roster.monthLabel %></div>
@@ -26,14 +29,14 @@
       <tr style="height:<%= pt(T.nameRowH) %>">
         <td style="font-size:<%= pt(T.daySize) %>">Name</td>
         <% columns.forEach((emp) => { %>
-          <td class="name <%= editable(emp) ? 'own' : '' %>" style="font-size:<%= pt(emp ? nameSize(emp.name) : T.nameSize) %>">
+          <td class="name <%= ownClass(emp) %>" style="font-size:<%= pt(emp ? nameSize(emp.name) : T.nameSize) %>">
             <% if (emp && locals.linkBase) { %><a href="<%= linkBase %>/<%= emp.id %>?monat=<%= roster.month %>"><%= emp.name %></a><% } else if (emp) { %><%= emp.name %><% } %>
           </td>
         <% }) %>
       </tr>
       <tr style="height:<%= pt(T.secondRowH) %>">
         <td></td>
-        <% columns.forEach((emp) => { %><td class="<%= editable(emp) ? 'own' : '' %>"></td><% }) %>
+        <% columns.forEach((emp) => { %><td class="<%= ownClass(emp) %>"></td><% }) %>
       </tr>
       <% for (let d = 1; d <= 31; d++) { %>
         <tr style="height:<%= pt(T.rowH) %>">
@@ -41,36 +44,41 @@
           <% columns.forEach((emp) => {
                const c = emp && emp.days[d];
                const date = `${roster.month}-${pad2(d)}`;
-               const clickable = editable(emp) && d <= roster.daysInMonth && date <= locals.today;
+               const canType = own(emp) && d <= roster.daysInMonth && editable(date);
           %>
-            <td class="<%= d > roster.daysInMonth ? 'missing' : '' %> <%= editable(emp) ? 'own' : '' %> <%= clickable ? 'editable' : '' %>"
-                <% if (clickable) { %>data-open-entry data-user="<%= emp.id %>" data-date="<%= date %>"<% } %>><% if (c) { %>
-              <div class="rc" title="<%= emp.name %>, <%= d %>.: <%= c.timeRange || c.code %>">
-                <div class="rc-text" style="font-size:<%= pt(c.duration ? 8.5 : 9) %>">
-                  <% if (c.duration) { %><span><%= c.duration %></span><% } %>
-                  <% if (c.code) { %><span class="rc-code <%= c.duration ? '' : 'only' %>"><%= c.code %></span><% } %>
-                </div>
-                <% if (c.signatureId && showSignature(emp)) { %><img src="/signatur/<%= c.signatureId %>.png" alt="Unterschrift">
-                <% } else if (c.signatureId) { %><span class="rc-ok" title="unterschrieben">✓</span>
-                <% } else if (c.recordedByEmployer) { %><span class="rc-ag">AG</span><% } %>
+            <td class="<%= d > roster.daysInMonth ? 'missing' : '' %> <%= ownClass(emp) %> <%= canType ? 'editable' : '' %>">
+              <div class="rc" data-cell-view>
+                <% if (c) { %>
+                  <div class="rc-text" style="font-size:<%= pt(c.duration ? 8.5 : 9) %>">
+                    <% if (c.duration) { %><span><%= c.duration %></span><% } %>
+                    <% if (c.code) { %><span class="rc-code <%= c.duration ? '' : 'only' %>"><%= c.code %></span><% } %>
+                  </div>
+                  <% if (c.signatureId && showSignature(emp)) { %><img src="/signatur/<%= c.signatureId %>.png" alt="Unterschrift">
+                  <% } else if (c.signatureId) { %><span class="rc-ok" title="unterschrieben">✓</span>
+                  <% } else if (c.recordedByEmployer) { %><span class="rc-ag">AG</span><% } %>
+                <% } %>
               </div>
-            <% } %></td>
+              <% if (canType) { %>
+                <input class="rc-in" data-cell data-user="<%= emp.id %>" data-date="<%= date %>" value="<%= c ? c.raw : '' %>"
+                       autocomplete="off" autocapitalize="characters" enterkeyhint="next" aria-label="<%= emp.name %>, <%= d %>.">
+              <% } %>
+            </td>
           <% }) %>
         </tr>
       <% } %>
       <tr class="sum" style="height:<%= pt(T.sumRowH) %>">
         <td style="font-size:<%= pt(10) %>">Summe</td>
-        <% columns.forEach((emp) => { %><td class="<%= editable(emp) ? 'own' : '' %>" style="font-size:<%= pt(9.5) %>"><%= emp ? emp.total : '' %></td><% }) %>
+        <% columns.forEach((emp) => { %>
+          <td class="<%= ownClass(emp) %>" style="font-size:<%= pt(9.5) %>" <% if (emp) { %>data-sum-user="<%= emp.id %>"<% } %>><%= emp ? emp.total : '' %></td>
+        <% }) %>
       </tr>
     </table>
 
-    <% const E = R.employer; %>
+    <% const E = R.employer; const sig = roster.employerSignature; %>
     <div class="line" style="left:<%= pt(E.x1) %>;top:<%= pt(E.lineY) %>;width:<%= pt(E.x2 - E.x1) %>;border-top-width:<%= pt(0.6) %>"></div>
     <div class="abs" style="left:<%= pt(E.dateX - 30) %>;top:<%= pt(E.lineY + 3) %>;width:<%= pt(60) %>;text-align:center;font-size:<%= pt(E.size) %>">Datum</div>
     <div class="abs" style="left:<%= pt(E.labelX - 80) %>;top:<%= pt(E.lineY + 3) %>;width:<%= pt(160) %>;text-align:center;font-size:<%= pt(E.size) %>"><%= E.label %></div>
-    <% if (roster.employerSignature) { %>
-      <div class="abs" style="left:<%= pt(E.dateX - 30) %>;top:<%= pt(E.lineY - 13) %>;width:<%= pt(60) %>;text-align:center;font-size:<%= pt(10) %>"><%= roster.employerSignature.dateLabel %></div>
-      <img class="sig-img" src="/signatur/<%= roster.employerSignature.id %>.png" alt="<%= E.label %>" style="<%= rect({ x: E.dateX + 40, y: E.lineY - 36, w: E.x2 - E.dateX - 42, h: 35 }) %>">
-    <% } %>
+    <div class="abs" data-sig-date="roster-employer" style="left:<%= pt(E.dateX - 30) %>;top:<%= pt(E.lineY - 13) %>;width:<%= pt(60) %>;text-align:center;font-size:<%= pt(10) %>"><%= sig ? sig.dateLabel : '' %></div>
+    <img class="sig-img" data-sig-img="roster-employer" <%- sig ? `src="/signatur/${sig.id}.png"` : 'hidden' %> alt="<%= E.label %>" style="<%= rect({ x: E.dateX + 40, y: E.lineY - 36, w: E.x2 - E.dateX - 42, h: 35 }) %>">
   </div>
 </div>

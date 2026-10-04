@@ -21,10 +21,11 @@ export class InputError extends Error {}
 
 const pad = (n) => String(n).padStart(2, '0');
 
+// Uhrzeit wie auf Papier: "12", "9", "930", "1230", "12:30", "12.30"
 export function parseClock(value, label = 'Uhrzeit') {
   const s = String(value ?? '').trim();
   if (!s) return null;
-  const m = /^(\d{1,2})(?:[:.](\d{2}))?$/.exec(s);
+  const m = /^(\d{1,2})(?:[:.,]?(\d{2}))?$/.exec(s);
   if (!m) throw new InputError(`${label} „${s}“ ist ungültig (Format HH:MM).`);
   const h = Number(m[1]);
   const min = Number(m[2] ?? 0);
@@ -32,14 +33,16 @@ export function parseClock(value, label = 'Uhrzeit') {
   return h * 60 + min;
 }
 
-// Pause: "0:30", "30" (Minuten) oder "0,5" (Stunden).
+// Pause: "0:30", "30" oder "45" (Minuten), "1" (Stunden), "130" (1:30), "0,5" (Stunden).
 export function parseDuration(value) {
   const s = String(value ?? '').trim();
   if (!s) return 0;
-  let m = /^(\d{1,2}):(\d{2})$/.exec(s);
+  let m = /^(\d{1,2})[:.](\d{2})$/.exec(s);
   if (m && Number(m[2]) < 60) return Number(m[1]) * 60 + Number(m[2]);
-  m = /^\d{1,3}$/.exec(s);
-  if (m) return Number(s);
+  if (/^\d$/.test(s)) return Number(s) * 60;
+  if (/^\d{2}$/.test(s)) return Number(s);
+  m = /^(\d{1,2})(\d{2})$/.exec(s);
+  if (m && Number(m[2]) < 60) return Number(m[1]) * 60 + Number(m[2]);
   m = /^(\d{1,2})[,.](\d{1,2})$/.exec(s);
   if (m) return Math.round(Number(`${m[1]}.${m[2]}`) * 60);
   throw new InputError(`Pause „${s}“ ist ungültig (z. B. 0:30).`);
@@ -71,19 +74,6 @@ export function computeWorkMinutes(start, end, breakMinutes) {
   return net;
 }
 
-export function workTimeWarnings(workMinutes, breakMinutes) {
-  const warnings = [];
-  if (workMinutes > 9 * 60 && breakMinutes < 45) {
-    warnings.push('Bei mehr als 9 Stunden Arbeitszeit sind mindestens 45 Minuten Pause vorgeschrieben (§ 4 ArbZG).');
-  } else if (workMinutes > 6 * 60 && breakMinutes < 30) {
-    warnings.push('Bei mehr als 6 Stunden Arbeitszeit sind mindestens 30 Minuten Pause vorgeschrieben (§ 4 ArbZG).');
-  }
-  if (workMinutes > 10 * 60) {
-    warnings.push('Mehr als 10 Stunden Arbeitszeit pro Tag sind nach § 3 ArbZG grundsätzlich nicht zulässig.');
-  }
-  return warnings;
-}
-
 // ---- Datum ------------------------------------------------------------------
 
 export function todayISO(timeZone) {
@@ -112,14 +102,6 @@ export function formatDateDE(iso) {
   if (!iso) return '';
   const [y, m, d] = iso.split('-');
   return `${d}.${m}.${y}`;
-}
-
-export function daysBetween(fromISO, toISO) {
-  const toUTC = (iso) => {
-    const [y, m, d] = iso.split('-').map(Number);
-    return Date.UTC(y, m - 1, d);
-  };
-  return Math.round((toUTC(toISO) - toUTC(fromISO)) / 86400000);
 }
 
 // ---- Monat ("YYYY-MM") ------------------------------------------------------

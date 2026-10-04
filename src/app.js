@@ -11,9 +11,8 @@ import {
 } from './time.js';
 import adminRoutes from './routes/admin.js';
 import authRoutes from './routes/auth.js';
-import rosterRoutes from './routes/roster.js';
+import heftRoutes from './routes/heft.js';
 import settingsRoutes from './routes/settings.js';
-import timesheetRoutes from './routes/timesheet.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -77,8 +76,7 @@ export function createApp({ config, db = new LazyDatabase(config) }) {
   const ctx = { store, config };
   app.use(authRoutes(ctx));
   app.use(settingsRoutes(ctx));
-  app.use(timesheetRoutes(ctx));
-  app.use(rosterRoutes(ctx));
+  app.use(heftRoutes(ctx));
   app.use('/admin', adminRoutes(ctx));
 
   // Unterschriften als Bild: eigene, die des Arbeitgebers – der Chef darf alle sehen.

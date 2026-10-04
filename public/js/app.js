@@ -137,166 +137,247 @@
     });
   });
 
-  // ---- Erfassungsfenster ----------------------------------------------------
+  // ---- Heft: direkt ins Formular schreiben ----------------------------------
 
-  const dialog = document.getElementById('entry-dialog');
-  const dataEl = document.getElementById('entry-data');
-  if (dialog && dataEl) {
-    const data = JSON.parse(dataEl.textContent);
-    const form = dialog.querySelector('[data-entry-form]');
-    const input = (name) => form.querySelector(`[data-in="${name}"]`);
-    const out = (name) => form.querySelector(`[data-out="${name}"]`);
-    const saveBtn = form.querySelector('[data-save]');
-    const deleteBtn = form.querySelector('[data-delete]');
-    const pauseChips = form.querySelector('[data-chips="pause"]');
-    const codeChips = form.querySelector('[data-chips="kuerzel"]');
-    const morePause = form.querySelector('[data-more="pause"]');
-    const WEEKDAYS = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+  const CODES = ['K', 'U', 'UU', 'F', 'SA', 'SU'];
 
-    const dayTitle = (iso) => {
-      const [y, m, d] = iso.split('-').map(Number);
-      return `${WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]}, ${pad(d)}.${pad(m)}.${y}`;
+  // "12" → "12:00", "930" → "09:30", "12.30" → "12:30"; '' bleibt leer, null = nicht erkannt.
+  const normClock = (value) => {
+    const s = String(value).trim();
+    if (!s) return '';
+    const m = /^(\d{1,2})(?:[:.,]?(\d{2}))?$/.exec(s);
+    if (!m || Number(m[1]) > 23 || Number(m[2] ?? 0) > 59) return null;
+    return `${pad(Number(m[1]))}:${pad(Number(m[2] ?? 0))}`;
+  };
+
+  // Pause: "30" → 0:30, "1" → 1:00, "130" → 1:30, "0,5" → 0:30.
+  const normPause = (value) => {
+    const s = String(value).trim();
+    if (!s) return '';
+    let m;
+    let min = null;
+    if ((m = /^(\d{1,2})[:.](\d{2})$/.exec(s))) min = Number(m[1]) * 60 + Number(m[2]);
+    else if (/^\d$/.test(s)) min = Number(s) * 60;
+    else if (/^\d{2}$/.test(s)) min = Number(s);
+    else if ((m = /^(\d{1,2})(\d{2})$/.exec(s)) && Number(m[2]) < 60) min = Number(m[1]) * 60 + Number(m[2]);
+    else if ((m = /^(\d{1,2}),(\d{1,2})$/.exec(s))) min = Math.round(Number(`${m[1]}.${m[2]}`) * 60);
+    if (min == null) return null;
+    return min ? fmt(min) : '';
+  };
+
+  const heft = document.querySelector('[data-heft]');
+  if (heft) {
+    const csrf = heft.dataset.csrf;
+    const toastEl = document.querySelector('[data-toast]');
+    let toastTimer;
+    const toast = (message, kind = 'ok') => {
+      toastEl.textContent = message;
+      toastEl.className = `toast show toast-${kind}`;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toastEl.classList.remove('show'), kind === 'ok' ? 2500 : 5000);
     };
 
-    const setPause = (value) => {
-      input('pause').value = value || '0:00';
-      let matched = false;
-      pauseChips.querySelectorAll('button').forEach((b) => {
-        const on = b.dataset.value === input('pause').value;
-        b.classList.toggle('on', on);
-        matched ||= on;
-      });
-      morePause.value = matched ? '' : input('pause').value;
-      if (!matched && morePause.value !== input('pause').value) {
-        morePause.add(new Option(`${input('pause').value} Std`, input('pause').value));
-        morePause.value = input('pause').value;
-      }
-      morePause.classList.toggle('on', !matched);
-    };
-
-    const setCode = (value) => {
-      input('kuerzel').value = value || '';
-      codeChips.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.value === input('kuerzel').value));
-    };
-
-    const update = () => {
-      const start = parseClock(input('beginn').value);
-      const end = parseClock(input('ende').value);
-      const pause = parseClock(input('pause').value) ?? 0;
-      let text = '–';
-      let label = 'Stunden an diesem Tag';
-      let bad = false;
-      if (start != null && end != null) {
-        let gross = end - start;
-        if (gross < 0) gross += 24 * 60;
-        const net = gross - pause;
-        if (gross === 0 || net <= 0) {
-          text = 'ungültig';
-          bad = true;
-        } else {
-          text = `${fmt(net)} Std.`;
-          if (net > 9 * 60 && pause < 45) { label = 'Pause zu kurz – mind. 45 Min. (ArbZG)'; bad = true; }
-          else if (net > 6 * 60 && pause < 30) { label = 'Pause zu kurz – mind. 30 Min. (ArbZG)'; bad = true; }
+    // Speichervorgänge nacheinander abarbeiten, damit sich nichts überholt.
+    let queue = Promise.resolve();
+    const send = (payload) => {
+      const run = async () => {
+        let res;
+        try {
+          res = await fetch('/eintrag', {
+            method: 'POST',
+            body: new URLSearchParams({ ...payload, _csrf: csrf }),
+            headers: { Accept: 'application/json' },
+            redirect: 'manual',
+            keepalive: true,
+          });
+        } catch {
+          throw new Error('Keine Verbindung – bitte gleich noch einmal versuchen.');
         }
-      } else if (input('kuerzel').value) {
-        const chip = codeChips.querySelector('button.on');
-        text = chip ? chip.textContent.trim() : input('kuerzel').value;
-      }
-      out('duration').textContent = text;
-      out('resultLabel').textContent = label;
-      out('result').classList.toggle('invalid', bad);
+        let data = null;
+        try { data = await res.json(); } catch { /* keine JSON-Antwort */ }
+        if (!data) throw new Error('Sitzung abgelaufen – bitte die Seite neu laden.');
+        if (!res.ok) throw new Error(data.error || 'Speichern fehlgeschlagen.');
+        return data;
+      };
+      const p = queue.then(run, run);
+      queue = p.catch(() => {});
+      return p;
     };
 
-    const blockReason = (emp, date) => {
-      if (date > data.today) return 'Dieser Tag liegt in der Zukunft.';
-      if (data.locked) return 'Dieser Monat ist abgeschlossen.';
-      if (data.minDate && date < data.minDate) return 'Einträge älterer Monate kann nur der Chef ändern.';
-      if (emp.needsSignature) return 'Bitte zuerst unter „Einstellungen“ Ihre Unterschrift hinterlegen.';
-      return '';
+    const setSignature = (key, sig) => {
+      document.querySelectorAll(`[data-sig-img="${key}"]`).forEach((img) => {
+        if (sig) img.src = `/signatur/${sig.id}.png`;
+        else img.removeAttribute('src');
+        img.hidden = !sig;
+      });
+      document.querySelectorAll(`[data-sig-date="${key}"]`).forEach((el) => { el.textContent = sig ? sig.date : ''; });
     };
 
-    const open = (userId, date) => {
-      const emp = data.employees[userId];
-      if (!emp || !date) return;
-      const entry = emp.entries[date];
-      form.action = emp.save;
-      deleteBtn.formAction = emp.remove;
-      input('datum').value = date;
-      out('name').textContent = emp.name;
-      out('day').textContent = dayTitle(date);
-      input('beginn').value = entry?.beginn ?? '';
-      input('ende').value = entry?.ende ?? '';
-      input('bemerkung').value = entry?.bemerkung ?? '';
-      setPause(entry?.pause ?? '0:00');
-      setCode(entry?.kuerzel ?? '');
-      deleteBtn.classList.toggle('hidden', !entry);
+    const savedMessage = (data) => (data.total ? `✓ Gespeichert · Monatssumme ${data.total} Std.` : '✓ Gespeichert');
 
-      const recent = out('recent');
-      recent.replaceChildren();
-      for (const r of emp.recent) {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.textContent = `${r.beginn}–${r.ende}${r.pause !== '0:00' ? ` · ${r.pause} P.` : ''}`;
-        b.addEventListener('click', () => {
-          input('beginn').value = r.beginn;
-          input('ende').value = r.ende;
-          setPause(r.pause);
-          update();
-        });
-        recent.append(b);
-      }
-      out('recentWrap').classList.toggle('hidden', !emp.recent.length);
+    // ---- Stundenzettel: eine Zeile = ein Tag
+    const FIELDS = ['beginn', 'pause', 'ende', 'kuerzel', 'bemerkung'];
+    const rows = [...document.querySelectorAll('tr[data-row]')];
+    rows.forEach((tr, index) => {
+      const f = Object.fromEntries(FIELDS.map((n) => [n, tr.querySelector(`[name="${n}"]`)]));
+      const snapshot = () => FIELDS.map((n) => f[n].value).join('|');
+      let saved = snapshot();
 
-      const reason = blockReason(emp, date);
-      out('block').textContent = reason;
-      out('block').classList.toggle('hidden', !reason);
-      form.querySelectorAll('.dlg-body input, .dlg-body button, .dlg-body select, .dlg-foot button')
-        .forEach((el) => { el.disabled = !!reason; });
+      const commit = async () => {
+        const start = normClock(f.beginn.value);
+        const end = normClock(f.ende.value);
+        const pause = normPause(f.pause.value);
+        if (start === null || end === null || pause === null) {
+          tr.classList.add('row-error');
+          toast('Uhrzeit nicht erkannt – z. B. 12 oder 12:30 eingeben.', 'error');
+          return;
+        }
+        f.beginn.value = start;
+        f.ende.value = end;
+        f.pause.value = pause;
+        if (snapshot() === saved) {
+          tr.classList.remove('row-error', 'row-pending');
+          return;
+        }
+        if (!start !== !end) {
+          tr.classList.add('row-pending');
+          toast(start ? 'Ende fehlt noch.' : 'Beginn fehlt noch.', 'warn');
+          return;
+        }
+        tr.classList.remove('row-error', 'row-pending');
+        tr.classList.add('row-saving');
+        const sent = snapshot();
+        const payload = { user: tr.dataset.user, datum: tr.dataset.date };
+        FIELDS.forEach((n) => { payload[n] = f[n].value; });
+        try {
+          const data = await send(payload);
+          if (snapshot() === sent) FIELDS.forEach((n) => { f[n].value = data.row[n]; });
+          saved = snapshot() === sent ? snapshot() : sent;
+          tr.querySelector('[data-out="dauer"]').textContent = data.row.dauer;
+          const rec = tr.querySelector('[data-out="aufgezeichnet"]');
+          rec.textContent = data.row.aufgezeichnet;
+          if (data.row.ag) {
+            const small = document.createElement('small');
+            small.textContent = 'AG';
+            rec.append(' ', small);
+            document.querySelector('[data-ag-note]')?.removeAttribute('hidden');
+          }
+          document.querySelectorAll('[data-out="total"]').forEach((el) => { el.textContent = data.total; });
+          setSignature('employee', data.employeeSignature);
+          setSignature('employer', data.employerSignature);
+          toast(savedMessage(data));
+        } catch (err) {
+          tr.classList.add('row-error');
+          toast(err.message, 'error');
+        } finally {
+          tr.classList.remove('row-saving');
+        }
+      };
 
-      update();
-      if (typeof dialog.showModal === 'function') dialog.showModal();
-      else dialog.setAttribute('open', '');
-    };
-
-    const close = () => (typeof dialog.close === 'function' ? dialog.close() : dialog.removeAttribute('open'));
-
-    pauseChips.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { setPause(b.dataset.value); update(); }));
-    morePause.addEventListener('change', () => { if (morePause.value) { setPause(morePause.value); update(); } });
-    codeChips.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
-      setCode(input('kuerzel').value === b.dataset.value ? '' : b.dataset.value);
-      update();
-    }));
-    ['beginn', 'ende'].forEach((n) => ['input', 'change'].forEach((ev) => input(n).addEventListener(ev, update)));
-    form.querySelector('[data-dialog-close]').addEventListener('click', close);
-    dialog.addEventListener('click', (e) => { if (e.target === dialog) close(); });
-    form.addEventListener('submit', (e) => {
-      const deleting = e.submitter === deleteBtn;
-      if (!deleting && !input('beginn').value && !input('ende').value && !input('kuerzel').value) {
+      // Gespeichert wird, sobald man die Zeile verlässt.
+      tr.addEventListener('focusout', (e) => {
+        if (!tr.contains(e.relatedTarget)) commit();
+      });
+      tr.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' || e.target.tagName === 'SELECT') return;
         e.preventDefault();
-        out('block').textContent = 'Bitte von–bis eintragen oder ein Kürzel wählen.';
-        out('block').classList.remove('hidden');
-        return;
-      }
-      saveBtn.disabled = true;
-      deleteBtn.disabled = true;
-      // Der gedrückte Knopf ist deaktiviert – formaction deshalb selbst übernehmen.
-      if (deleting) form.action = deleteBtn.formAction;
+        const next = rows[index + 1]?.querySelector(`[name="${e.target.name}"]`);
+        if (next) next.focus();
+        else e.target.blur();
+      });
     });
 
-    document.addEventListener('click', (e) => {
-      const trigger = e.target.closest('[data-open-entry]');
-      if (!trigger || trigger.disabled) return;
-      e.preventDefault();
-      open(trigger.dataset.user, trigger.dataset.date);
+    // ---- Einsatzliste: "12-16" direkt in die Zelle
+    const parseCell = (text) => {
+      const s = text.trim();
+      if (!s) return { beginn: '', ende: '', pause: '', kuerzel: '', bemerkung: '' };
+      if (CODES.includes(s.toUpperCase())) return { beginn: '', ende: '', kuerzel: s.toUpperCase() };
+      const m = /^(\d{1,2}(?:[:.,]?\d{2})?)\s*(?:-|–|—|bis|\s)\s*(\d{1,2}(?:[:.,]?\d{2})?)$/i.exec(s);
+      if (!m) return null;
+      const beginn = normClock(m[1]);
+      const ende = normClock(m[2]);
+      if (!beginn || !ende) return null;
+      return { beginn, ende, kuerzel: '' };
+    };
+
+    const renderCell = (view, cell) => {
+      view.replaceChildren();
+      if (!cell) return;
+      const text = document.createElement('div');
+      text.className = 'rc-text';
+      text.style.fontSize = `calc(var(--pt) * ${cell.duration ? 8.5 : 9})`;
+      if (cell.duration) text.append(Object.assign(document.createElement('span'), { textContent: cell.duration }));
+      if (cell.code) {
+        text.append(Object.assign(document.createElement('span'), {
+          className: `rc-code ${cell.duration ? '' : 'only'}`, textContent: cell.code,
+        }));
+      }
+      view.append(text);
+      if (cell.signatureId) {
+        view.append(Object.assign(document.createElement('img'), { src: `/signatur/${cell.signatureId}.png`, alt: 'Unterschrift' }));
+      } else if (cell.ag) {
+        view.append(Object.assign(document.createElement('span'), { className: 'rc-ag', textContent: 'AG' }));
+      }
+    };
+
+    const cells = [...document.querySelectorAll('input[data-cell]')];
+    cells.forEach((input) => {
+      let saved = input.value;
+      const td = input.closest('td');
+      input.addEventListener('focus', () => input.select());
+      input.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        const sameColumn = cells.filter((c) => c.dataset.user === input.dataset.user);
+        const next = sameColumn[sameColumn.indexOf(input) + 1];
+        if (next) next.focus();
+        else input.blur();
+      });
+      input.addEventListener('blur', async () => {
+        if (input.value.trim() === saved.trim()) return;
+        const parsed = parseCell(input.value);
+        if (!parsed) {
+          td.classList.add('cell-error');
+          toast('Bitte z. B. 12-16 eintragen (oder U, K, F …).', 'error');
+          return;
+        }
+        td.classList.remove('cell-error');
+        td.classList.add('cell-saving');
+        try {
+          const data = await send({ user: input.dataset.user, datum: input.dataset.date, ...parsed });
+          input.value = data.cell ? data.cell.raw : '';
+          saved = input.value;
+          renderCell(td.querySelector('[data-cell-view]'), data.cell);
+          document.querySelectorAll(`[data-sum-user="${input.dataset.user}"]`).forEach((el) => { el.textContent = data.total; });
+          setSignature('roster-employer', data.rosterEmployerSignature);
+          toast(data.cell?.duration ? `✓ ${data.cell.duration} Std. · Monatssumme ${data.total} Std.` : savedMessage(data));
+        } catch (err) {
+          td.classList.add('cell-error');
+          toast(err.message, 'error');
+        } finally {
+          td.classList.remove('cell-saving');
+        }
+      });
     });
 
-    // Auf dem Handy die eigene Spalte der Einsatzliste ins Bild scrollen.
-    const own = document.querySelector('.roster-table td.name.own');
-    if (own) {
-      const scroller = own.closest('.paper-scroll');
-      if (scroller && scroller.scrollWidth > scroller.clientWidth) {
-        scroller.scrollLeft = own.offsetLeft - scroller.clientWidth / 2 + own.offsetWidth / 2 + own.closest('table').offsetLeft;
+    // Beim Verlassen der Seite das gerade bearbeitete Feld noch speichern.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden' && document.activeElement?.matches('.cell-in, .rc-in')) {
+        document.activeElement.blur();
       }
+    });
+
+    // Auf dem Handy: Formular so verschieben, dass die Tabelle bzw. die eigene Spalte sichtbar ist.
+    document.querySelectorAll('[data-scroll]').forEach((scroller) => {
+      if (scroller.scrollWidth <= scroller.clientWidth) return;
+      const target = scroller.querySelector('td.name.own') ?? scroller.querySelector('table');
+      if (!target) return;
+      const left = target.getBoundingClientRect().left - scroller.getBoundingClientRect().left + scroller.scrollLeft;
+      scroller.scrollLeft = target.matches('td') ? left - (scroller.clientWidth - target.offsetWidth) / 2 : left - 8;
+    });
+    const todayRow = document.querySelector('tr.today');
+    if (todayRow && todayRow.getBoundingClientRect().bottom > window.innerHeight) {
+      todayRow.scrollIntoView({ block: 'center' });
     }
   }
 

@@ -5,10 +5,9 @@ export const DEFAULT_SETTINGS = {
   roster_title: 'Einsatzliste für Minijobber',
   logo: '',
   employer_signature_id: '',
-  demo: '',
 };
 
-const TABLES = ['settings', 'users', 'signatures', 'entries', 'month_locks', 'audit_log'];
+const TABLES = ['settings', 'users', 'signatures', 'entries'];
 
 const SAVE_ENTRY_SQL = `
   INSERT INTO entries (user_id, work_date, start_time, end_time, break_minutes, work_minutes, code, remarks,
@@ -22,7 +21,6 @@ const SAVE_ENTRY_SQL = `
     recorded_on = excluded.recorded_on, recorded_by = excluded.recorded_by,
     signature_id = excluded.signature_id, updated_at = CURRENT_TIMESTAMP`;
 
-const AUDIT_SQL = 'INSERT INTO audit_log (actor_id, user_id, work_date, action, data) VALUES (?, ?, ?, ?, ?)';
 
 export class Store {
   constructor(db) {
@@ -147,63 +145,16 @@ export class Store {
     return this.db.all('SELECT * FROM entries WHERE substr(work_date, 1, 7) = ? ORDER BY work_date', [month]);
   }
 
-  async monthTotalMinutes(userId, month) {
-    const row = await this.db.get(
-      'SELECT COALESCE(SUM(work_minutes), 0) AS m FROM entries WHERE user_id = ? AND substr(work_date, 1, 7) = ?',
-      [userId, month],
-    );
-    return Number(row.m);
-  }
-
-  // Zuletzt gearbeitete Schichten je Mitarbeiter – für die Schnellauswahl im Erfassungsfenster.
-  async recentShifts(sinceDate, limit = 3) {
-    const rows = await this.db.all(`
-      SELECT user_id, start_time, end_time, break_minutes, MAX(work_date) AS last
-      FROM entries WHERE start_time IS NOT NULL AND work_date >= ?
-      GROUP BY user_id, start_time, end_time, break_minutes
-      ORDER BY last DESC
-    `, [sinceDate]);
-    const byUser = {};
-    for (const r of rows) {
-      byUser[r.user_id] ??= [];
-      if (byUser[r.user_id].length < limit) byUser[r.user_id].push(r);
-    }
-    return byUser;
-  }
-
-  async saveEntry(entry, audit) {
-    const statements = [[SAVE_ENTRY_SQL, entry]];
-    if (audit) statements.push([AUDIT_SQL, [audit.actorId, entry.user_id, entry.work_date, audit.action, JSON.stringify(audit.data)]]);
-    await this.db.batch(statements);
+  async saveEntry(entry) {
+    await this.db.run(SAVE_ENTRY_SQL, entry);
   }
 
   async saveEntries(entries) {
     if (entries.length) await this.db.batch(entries.map((e) => [SAVE_ENTRY_SQL, e]));
   }
 
-  async deleteEntry(userId, workDate, audit) {
-    await this.db.batch([
-      ['DELETE FROM entries WHERE user_id = ? AND work_date = ?', [userId, workDate]],
-      [AUDIT_SQL, [audit.actorId, userId, workDate, 'delete', JSON.stringify(audit.data)]],
-    ]);
-  }
-
-  // ---- Monatsabschluss ------------------------------------------------------
-
-  async isLocked(month) {
-    return !!(await this.getLock(month));
-  }
-
-  getLock(month) {
-    return this.db.get('SELECT * FROM month_locks WHERE month = ?', [month]);
-  }
-
-  async lockMonth(month, userId) {
-    await this.db.run('INSERT OR IGNORE INTO month_locks (month, locked_by) VALUES (?, ?)', [month, userId]);
-  }
-
-  async unlockMonth(month) {
-    await this.db.run('DELETE FROM month_locks WHERE month = ?', [month]);
+  async deleteEntry(userId, workDate) {
+    await this.db.run('DELETE FROM entries WHERE user_id = ? AND work_date = ?', [userId, workDate]);
   }
 
   // ---- Sitzungen ------------------------------------------------------------
@@ -243,15 +194,6 @@ export class Store {
     await this.db.run('DELETE FROM sessions WHERE user_id = ? AND id_hash != ?', [userId, exceptIdHash]);
   }
 
-  // ---- Protokoll ------------------------------------------------------------
-
-  listAudit(userId, month) {
-    return this.db.all(`
-      SELECT a.*, u.name AS actor_name FROM audit_log a LEFT JOIN users u ON u.id = a.actor_id
-      WHERE a.user_id = ? AND substr(a.work_date, 1, 7) = ? ORDER BY a.id DESC
-    `, [userId, month]);
-  }
-
   // ---- Sicherung ------------------------------------------------------------
 
   // SQL-Datei mit allen Daten; einspielbar mit `sqlite3 neu.db < datei.sql` bzw. `turso db shell … < datei.sql`.
@@ -275,10 +217,5 @@ export class Store {
     }
     lines.push('COMMIT;', '');
     return lines.join('\n');
-  }
-
-  // Nur für den Demo-Modus: alles löschen und neu einrichten.
-  async wipeAll() {
-    await this.db.batch([...TABLES, 'sessions'].map((t) => [`DELETE FROM ${t}`]));
   }
 }

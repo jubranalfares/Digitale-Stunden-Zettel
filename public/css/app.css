@@ -161,16 +161,7 @@ input[type="checkbox"] { display: inline-block; width: 20px; min-height: 20px; h
 .month-nav span.disabled { color: #c9c4b9; }
 .month-nav strong { padding: 0 10px; min-width: 140px; text-align: center; }
 
-.paper-section h2 { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.paper-hint { font-size: .85rem; color: var(--muted); font-weight: 400; }
 
-.entry-list { width: 100%; border-collapse: collapse; font-size: .92rem; }
-.entry-list td, .entry-list th { padding: 8px 6px; border-bottom: 1px solid #ece9e2; text-align: left; }
-.entry-list th { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
-.entry-list tr[data-open-entry] { cursor: pointer; }
-.entry-list tfoot td { font-weight: 700; border-bottom: 0; }
-.entry-list .num { font-variant-numeric: tabular-nums; }
-.mobile-only { display: none; }
 
 /* ---- Tabellen (Chef) -------------------------------------------------------- */
 
@@ -184,17 +175,10 @@ input[type="checkbox"] { display: inline-block; width: 20px; min-height: 20px; h
 .data-table .actions { text-align: right; white-space: nowrap; }
 .data-table tr.inactive td { color: var(--muted); }
 
-.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
-.stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
-.stat span { display: block; color: var(--muted); font-size: .82rem; }
-.stat strong { font-size: 1.45rem; font-variant-numeric: tabular-nums; }
 
-.export-card { display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: center; }
 .sig-preview { display: inline-block; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; }
 .sig-preview img { display: block; height: 60px; max-width: 260px; object-fit: contain; }
 
-details.audit summary { cursor: pointer; font-weight: 600; }
-details.audit table { margin-top: 10px; font-size: .85rem; }
 
 /* ---- Unterschriftenfeld ---------------------------------------------------- */
 
@@ -261,89 +245,78 @@ details.audit table { margin-top: 10px; font-size: .85rem; }
 .paper .sig-img { position: absolute; object-fit: contain; object-position: center bottom; }
 .paper .line { position: absolute; border-top: calc(var(--pt) * .8) solid #000; }
 
-/* ---- Erfassungsfenster -------------------------------------------------------- */
+/* ---- Heft ------------------------------------------------------------------------- */
 
-.quick-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 18px; }
-.btn-big { min-height: 52px; padding: 10px 22px; font-size: 1.05rem; border-radius: 12px; }
-
-.entry-dialog {
-  width: min(480px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding: 0; border: 0;
-  border-radius: 18px; box-shadow: 0 20px 60px rgba(0, 0, 0, .3); color: var(--text); background: var(--surface);
+.heft-top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+.heft-top .btn-primary { margin-left: auto; }
+.heft-tabs { display: flex; gap: 4px; overflow-x: auto; margin: 0 0 14px; padding-bottom: 2px; scrollbar-width: thin; }
+.heft-tabs a {
+  flex: none; padding: 9px 14px; border-radius: 10px 10px 0 0; background: #e6e2d9; color: var(--text);
+  text-decoration: none; font-weight: 600; font-size: .92rem; border-bottom: 3px solid transparent; white-space: nowrap;
 }
-.entry-dialog::backdrop { background: rgba(15, 30, 30, .45); }
-.entry-dialog form { display: flex; flex-direction: column; max-height: calc(100dvh - 24px); }
-.dlg-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 18px 20px 10px; }
-.dlg-head h2 { margin: 0; font-size: 1.25rem; }
-.dlg-who { color: var(--accent); font-weight: 700; font-size: .9rem; }
-.dlg-x { border: 0; background: #f0eee8; width: 38px; height: 38px; border-radius: 50%; font-size: 1rem; cursor: pointer; color: var(--muted); flex: none; }
-.dlg-body { padding: 4px 20px 12px; overflow-y: auto; }
-.dlg-label { font-weight: 600; font-size: .85rem; margin: 14px 0 6px; color: var(--muted); }
-.dlg-times { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: end; gap: 8px; margin-top: 6px; }
-.dlg-times label { min-width: 0; }
-.dlg-times input { min-width: 0; font-size: 1.3rem; font-weight: 600; text-align: center; min-height: 56px; padding: 8px 6px; font-variant-numeric: tabular-nums; }
-.dlg-dash { padding-bottom: 14px; font-size: 1.3rem; color: var(--muted); }
-.dlg-remark { margin-top: 14px; }
-.dlg-result {
-  display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 16px;
-  background: var(--accent-soft); color: var(--accent-strong); border-radius: 12px; padding: 12px 16px; font-weight: 600;
-}
-.dlg-result strong { font-size: 1.6rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.dlg-result.invalid { background: var(--warn-soft); color: var(--warn); }
-.dlg-foot { display: flex; gap: 10px; padding: 12px 20px 18px; border-top: 1px solid #ece9e2; }
-.dlg-foot .btn-primary { flex: 1; min-height: 50px; font-size: 1.05rem; }
-.dlg-body .flash { margin: 6px 0 4px; }
+.heft-tabs a.active { background: #fff; border-bottom-color: var(--accent); color: var(--accent-strong); }
+.heft-hint { color: var(--muted); font-size: .9rem; max-width: 860px; margin: 12px auto 0; }
 
-.chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.chips button, .chips select {
-  width: auto; min-height: 40px; margin: 0; padding: 6px 12px; border-radius: 99px; border: 1px solid #cfcabe;
-  background: #fff; font: inherit; font-size: .9rem; color: var(--text); cursor: pointer;
+/* Felder direkt im Formular */
+.paper .cell-in {
+  display: block; width: 100%; height: calc(var(--pt) * 15.6); min-height: 0; margin: 0; padding: 0 calc(var(--pt) * 1.5);
+  border: 0; border-radius: 0; background: transparent; color: #000; font: inherit; font-size: inherit;
+  text-align: center; box-shadow: none;
 }
-.chips select { padding-right: 28px; }
-.chips button.on, .chips select.on { background: var(--accent); border-color: var(--accent); color: #fff; }
-.chips-codes button { font-size: .82rem; }
-.dlg-recent .chips button { background: var(--accent-soft); border-color: #c3dedc; color: var(--accent-strong); font-weight: 600; }
-
-@media (max-width: 640px) {
-  /* Auf dem Handy als Blatt von unten */
-  .entry-dialog { width: 100vw; max-width: 100vw; margin: auto 0 0; border-radius: 18px 18px 0 0; }
-  .entry-dialog form { max-height: 92dvh; }
-}
-
-/* ---- Antippbare Formulare ------------------------------------------------------- */
+.paper .cell-in:focus { background: #fff6c8; outline: 2px solid var(--accent); outline-offset: -2px; }
+.paper select.cell-in { appearance: none; -webkit-appearance: none; text-align-last: center; font-weight: 700; padding: 0; cursor: pointer; }
+.paper td.remarks .cell-in { text-align: left; padding: 0 calc(var(--pt) * 3); }
+.datev-table tr[data-row]:hover td { background: #f4faf9; }
+.datev-table tr.today td { background: #fffbe6; }
+.datev-table tr.row-pending td { background: #fff1c2; }
+.datev-table tr.row-error td { background: var(--danger-soft); }
+.datev-table tr.row-saving td, .roster-table td.cell-saving { opacity: .6; }
 
 .roster-table td.own { background: #f4faf9; }
-.roster-table td.editable { cursor: pointer; }
+.roster-table td.editable { position: relative; cursor: text; }
 .roster-table td.editable:hover { background: #e3f0ef; }
 .roster-table td.missing { background: #f1f1f1; }
+.roster-table td.cell-error { background: var(--danger-soft); }
 .roster-table .rc-ok { flex: 1; text-align: right; color: #1e6b37; font-weight: 700; }
+.paper .rc-in {
+  position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; margin: 0; padding: 0 calc(var(--pt) * 2.5);
+  border: 0; border-radius: 0; background: transparent; color: transparent; caret-color: transparent;
+  font: inherit; font-size: calc(var(--pt) * 9); text-align: left; cursor: text;
+}
+.paper .rc-in:focus { background: #fff6c8; color: #000; caret-color: auto; outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.toast {
+  position: fixed; left: 50%; bottom: 20px; transform: translate(-50%, 140%); z-index: 50;
+  max-width: calc(100vw - 32px); padding: 12px 18px; border-radius: 12px; font-weight: 600;
+  background: #16302f; color: #fff; box-shadow: 0 8px 24px rgba(0, 0, 0, .25); transition: transform .2s ease, opacity .2s ease;
+  pointer-events: none; opacity: 0;
+}
+.toast.show { transform: translate(-50%, 0); opacity: 1; }
+.toast-warn { background: #7a4f00; }
+.toast-error { background: var(--danger); }
 
 .paper-scroll + .paper-scroll { margin-top: 24px; }
-
-.demo-box { margin-top: 20px; padding: 14px 16px; border-radius: 12px; background: #f6f4ef; border: 1px dashed #cfcabe; }
-.demo-box p { margin: 4px 0 10px; }
 .steps { padding-left: 22px; }
 .steps li { margin-bottom: 8px; }
 code { background: #f0eee8; padding: 1px 5px; border-radius: 4px; font-size: .9em; }
 
-@media (max-width: 760px) {
-  /* Papier auf dem Handy größer und seitlich scrollbar, damit man Tage gut antippen kann */
+@media (max-width: 900px) {
+  /* Formular auf dem Handy groß genug zum Reinschreiben, seitlich verschiebbar */
   .paper-scroll { overflow-x: auto; margin: 0 -12px; padding: 0 12px 8px; -webkit-overflow-scrolling: touch; }
-  .paper-scroll .paper-wrap { min-width: 720px; }
-  .roster-scroll .paper-wrap { min-width: 780px; }
+  .paper-scroll .paper-wrap { min-width: 820px; }
+  .roster-scroll .paper-wrap { min-width: 880px; }
 }
 
 /* ---- Mobil ------------------------------------------------------------------ */
 
 @media (max-width: 900px) {
-  .export-card { grid-template-columns: 1fr; }
-}
+  }
 
 @media (max-width: 640px) {
   .container { padding: 14px 12px 40px; }
   .card { padding: 16px; }
   h1 { font-size: 1.3rem; }
   .form-grid { grid-template-columns: 1fr; }
-  .mobile-only { display: block; }
   .hide-mobile { display: none !important; }
   .data-table th, .data-table td { padding: 9px 6px; }
   .brand small { display: none; }

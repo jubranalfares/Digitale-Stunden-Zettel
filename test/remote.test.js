@@ -45,26 +45,33 @@ async function call(path, form) {
   return { status: res.status, location: res.headers.get('location'), data };
 }
 
-test('Online-Datenbank: Demo, Einsatzliste, Erfassen und PDF', async (t) => {
+test('Online-Datenbank: Einrichten, ins Heft schreiben, PDF', async (t) => {
   if (skip) return t.skip('node:sqlite nicht verfügbar');
   assert.equal((await call('/')).location, '/setup');
-  const demo = await call('/setup/demo', {});
-  assert.equal(demo.location, '/admin');
+  await call('/setup');
+  const setup = await call('/setup', {
+    firma: 'Eiscafé Taormina', name: 'Chef', benutzername: 'chef', passwort: 'geheim123', passwort2: 'geheim123',
+  });
+  assert.equal(setup.status, 302);
+  await call('/admin/mitarbeiter');
+  const created = await call('/admin/mitarbeiter', { name: 'Giulia Romano', benutzername: 'giulia', passwort: 'start1234' });
+  assert.equal(created.location, '/admin/mitarbeiter');
 
-  const dash = await call('/admin');
-  assert.match(dash.data, /Giulia Romano/);
   const roster = await call('/einsatzliste');
   assert.match(roster.data, /Einsatzliste für Minijobber/);
+  const userId = /data-cell data-user="(\d+)"/.exec(roster.data)[1];
+  const today = /data-cell data-user="\d+" data-date="([\d-]+)"/g;
+  let last;
+  for (const m of roster.data.matchAll(today)) last = m[1];
 
-  const data = JSON.parse(/id="entry-data">(.*?)<\/script>/s.exec(roster.data)[1]);
-  const [giuliaId] = Object.entries(data.employees).find(([, e]) => e.name === 'Giulia Romano');
-  const saved = await call(`/admin/zettel/${giuliaId}/eintrag`, {
-    datum: data.today, beginn: '12:00', ende: '16:00', pause: '0:00', zurueck: '/einsatzliste',
-  });
-  assert.equal(saved.location, '/einsatzliste');
-  assert.match((await call('/einsatzliste')).data, /12:00–16:00 = 4:00 Std\./);
+  const saved = await call('/eintrag', { user: userId, datum: last, beginn: '12', ende: '16', kuerzel: '' });
+  assert.equal(saved.status, 200);
+  const data = JSON.parse(saved.data);
+  assert.equal(data.cell.duration, '4:00');
+  assert.equal(data.total, '4:00');
+  assert.match((await call('/einsatzliste')).data, /4:00/);
 
-  const pdf = await call('/admin/export.pdf');
+  const pdf = await call('/pdf');
   assert.equal(pdf.data.subarray(0, 4).toString(), '%PDF');
   const backup = await call('/admin/sicherung');
   assert.match(backup.data.toString(), /INSERT OR REPLACE INTO entries/);

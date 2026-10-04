@@ -1,7 +1,7 @@
-// Beispieldaten zum Ausprobieren (inkl. generierter Unterschriften).
+// Beispieldaten für Entwicklung und Screenshots (inkl. generierter Unterschriften).
 import zlib from 'node:zlib';
-import { hashPassword } from './auth.js';
-import { computeWorkMinutes, daysInMonth, isoDate, shiftMonth } from './time.js';
+import { hashPassword } from '../src/auth.js';
+import { computeWorkMinutes, daysInMonth, isoDate, shiftMonth } from '../src/time.js';
 
 // ---- kleine PNG-Unterschrift erzeugen (ohne Zusatzbibliotheken) -------------
 
@@ -95,12 +95,9 @@ const SHIFTS = [
   [10 * 60, 15 * 60, 0], [15 * 60, 22 * 60 + 30, 30],
 ];
 
-export const DEMO_LOGINS = { chef: ['chef', 'chef1234'], employee: ['giulia', 'test1234'] };
-
 export async function seedDemo(store, { today }) {
   if (await store.countUsers() > 0) throw new Error('Die Datenbank ist nicht leer – Beispieldaten werden nur in eine leere Datenbank geschrieben.');
   await store.setSetting('company_name', 'Eiscafé Taormina');
-  await store.setSetting('demo', '1');
 
   const chefId = await store.createUser({
     username: 'chef', passwordHash: await hashPassword('chef1234'), role: 'admin', name: 'Chef',

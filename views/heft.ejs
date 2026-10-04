@@ -1,0 +1,50 @@
+<%- include('partials/header') %>
+<div class="heft" data-heft data-csrf="<%= csrfToken %>">
+  <div class="heft-top">
+    <%- include('partials/month-nav', { navBase, ym, isCurrentMonth }) %>
+    <% if (isAdmin) { %>
+      <a class="btn btn-primary" href="/pdf?monat=<%= monthKey(ym) %>" target="_blank" rel="noopener">PDF für Steuerberater</a>
+    <% } %>
+  </div>
+
+  <% if (signatureMissing) { %>
+    <div class="flash flash-warning banner">
+      <span>Bitte einmal unterschreiben – danach setzt das System Ihre Unterschrift automatisch.</span>
+      <a class="btn btn-small" href="/einstellungen#unterschrift">Unterschreiben</a>
+    </div>
+  <% } %>
+  <% if (employerSignatureMissing) { %>
+    <div class="flash flash-warning banner">
+      <span>Ihre Unterschrift als Chef fehlt noch.</span>
+      <a class="btn btn-small" href="/einstellungen#unterschrift">Unterschreiben</a>
+    </div>
+  <% } %>
+
+  <nav class="heft-tabs" aria-label="Register">
+    <% tabs.forEach((t) => { %>
+      <a href="<%= t.href %>" class="<%= t.key === tab ? 'active' : '' %>"><%= t.label %></a>
+    <% }) %>
+  </nav>
+
+  <% if (kind === 'sheet') { %>
+    <div class="paper-scroll" data-scroll>
+      <%- include('partials/datev-paper', { sheet, interactive: true, editable }) %>
+    </div>
+    <p class="heft-hint">Einfach in die Felder tippen, z. B. <strong>12</strong> für 12:00. Dauer, Summe und Unterschrift setzt das System – gespeichert wird automatisch.</p>
+  <% } else { %>
+    <% roster.pages.forEach((columns, pageIndex) => { %>
+      <div class="paper-scroll roster-scroll" data-scroll>
+        <%- include('partials/roster-paper', {
+          roster, columns, pageIndex, viewer: user, editable, canEditColumn,
+          linkBase: isAdmin ? '/zettel' : '',
+        }) %>
+      </div>
+    <% }) %>
+    <p class="heft-hint">
+      <%= isAdmin ? 'In jede Spalte' : 'In Ihrer Spalte' %> einfach <strong>12-16</strong> eintragen – das System macht daraus 4:00 Std. und setzt die Unterschrift.
+      Auch <strong>U</strong> (Urlaub), <strong>K</strong> (Krank), <strong>F</strong> (Feiertag) usw. sind möglich. Feld leeren = Eintrag löschen.
+    </p>
+  <% } %>
+</div>
+<div class="toast" data-toast role="status" aria-live="polite"></div>
+<%- include('partials/footer') %>

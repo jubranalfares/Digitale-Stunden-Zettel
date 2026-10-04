@@ -10,18 +10,34 @@ function signatureBlock(signature, date) {
   return { id: signature.id, image: signature.image, date, dateLabel: formatDateDE(date) };
 }
 
-function rowFromEntry(entry, employeeId) {
+// Eine Zeile des Stundenzettels.
+export function rowFromEntry(entry, employeeId) {
+  const timed = entry.start_time != null;
   return {
     entry,
     start: formatClock(entry.start_time),
-    breakTime: entry.start_time == null ? '' : formatDuration(entry.break_minutes),
+    breakTime: timed && entry.break_minutes ? formatDuration(entry.break_minutes) : '',
     end: formatClock(entry.end_time),
-    duration: entry.start_time == null ? '' : formatDuration(entry.work_minutes),
+    duration: timed ? formatDuration(entry.work_minutes) : '',
     code: entry.code ?? '',
     recordedOn: formatDateDE(entry.recorded_on),
     // Vom Chef erfasste oder korrigierte Zeilen werden markiert.
     recordedByEmployer: entry.recorded_by !== employeeId,
     remarks: entry.remarks,
+  };
+}
+
+// Eine Tageszelle der Einsatzliste: Stunden + Unterschrift; "raw" ist der Text zum Bearbeiten ("12:00-16:00").
+export function rosterCell(entry, employeeId, signatureImage = null) {
+  const timed = entry.start_time != null;
+  const ownEntry = entry.recorded_by === employeeId;
+  return {
+    duration: timed ? formatDuration(entry.work_minutes) : '',
+    raw: timed ? `${formatClock(entry.start_time)}-${formatClock(entry.end_time)}` : (entry.code ?? ''),
+    code: entry.code ?? '',
+    signatureId: ownEntry ? entry.signature_id : null,
+    signature: ownEntry ? signatureImage : null,
+    recordedByEmployer: !ownEntry,
   };
 }
 
@@ -75,49 +91,47 @@ export async function buildEmployeeSheet(store, employee, ym) {
     totalDecimal: formatDecimalHours(totalMinutes),
     employeeSignature,
     employerSignature,
-    locked: await store.isLocked(month),
   };
 }
 
 // Großes Blatt mit allen Mitarbeitern ("Einsatzliste"). 8 Mitarbeiter pro Seite wie auf dem Papierformular.
 export const ROSTER_COLUMNS = 8;
 
+async function rosterEmployees(store, month) {
+  return (await store.employeesForMonth(month)).filter((u) => u.on_roster);
+}
+
+// Unterschrift des Arbeitgebers unten auf der Einsatzliste: datiert auf den letzten Eintrag aller Mitarbeiter.
+export async function rosterEmployerSignature(store, month, entries, users) {
+  const ids = new Set((users ?? await rosterEmployees(store, month)).map((u) => u.id));
+  const all = entries ?? await store.listMonthEntries(month);
+  const lastRecorded = maxDate(all.filter((e) => ids.has(e.user_id)).map((e) => e.recorded_on));
+  return lastRecorded ? signatureBlock(await store.employerSignatureAt(lastRecorded), lastRecorded) : null;
+}
+
 export async function buildRoster(store, ym) {
   const month = monthKey(ym);
   const settings = await store.getSettings();
   const entries = await store.listMonthEntries(month);
+  const users = await rosterEmployees(store, month);
 
-  // Alle benötigten Unterschriften vorab laden
+  // Alle benötigten Unterschriften auf einmal laden
   const images = await store.getSignatureImages(entries.map((e) => e.signature_id));
-  const signatureImage = (id) => images.get(id) ?? null;
 
-  const employees = (await store.employeesForMonth(month))
-    .filter((u) => u.on_roster)
-    .map((u) => {
-      const own = entries.filter((e) => e.user_id === u.id);
-      const days = {};
-      for (const e of own) {
-        const day = Number(e.work_date.slice(8, 10));
-        days[day] = {
-          duration: e.start_time == null ? '' : formatDuration(e.work_minutes),
-          timeRange: e.start_time == null ? '' : `${formatClock(e.start_time)}–${formatClock(e.end_time)}`,
-          code: e.code ?? '',
-          signatureId: e.recorded_by === u.id ? e.signature_id : null,
-          signature: e.recorded_by === u.id ? signatureImage(e.signature_id) : null,
-          recordedByEmployer: e.recorded_by !== u.id,
-        };
-      }
-      const totalMinutes = own.reduce((sum, e) => sum + e.work_minutes, 0);
-      return {
-        id: u.id,
-        name: u.name,
-        personnelNo: u.personnel_no,
-        signature_id: u.signature_id,
-        days,
-        totalMinutes,
-        total: own.length ? formatDuration(totalMinutes) : '',
-      };
-    });
+  const employees = users.map((u) => {
+    const own = entries.filter((e) => e.user_id === u.id);
+    const days = {};
+    for (const e of own) days[Number(e.work_date.slice(8, 10))] = rosterCell(e, u.id, images.get(e.signature_id) ?? null);
+    const totalMinutes = own.reduce((sum, e) => sum + e.work_minutes, 0);
+    return {
+      id: u.id,
+      name: u.name,
+      signature_id: u.signature_id,
+      days,
+      totalMinutes,
+      total: own.length ? formatDuration(totalMinutes) : '',
+    };
+  });
 
   const pages = [];
   for (let i = 0; i < Math.max(employees.length, 1); i += ROSTER_COLUMNS) {
@@ -125,9 +139,6 @@ export async function buildRoster(store, ym) {
     while (columns.length < ROSTER_COLUMNS) columns.push(null);
     pages.push(columns);
   }
-
-  const rosterIds = new Set(employees.map((e) => e.id));
-  const lastRecorded = maxDate(entries.filter((e) => rosterIds.has(e.user_id)).map((e) => e.recorded_on));
 
   return {
     ym,
@@ -138,7 +149,6 @@ export async function buildRoster(store, ym) {
     daysInMonth: daysInMonth(ym.year, ym.month),
     employees,
     pages,
-    employerSignature: lastRecorded ? signatureBlock(await store.employerSignatureAt(lastRecorded), lastRecorded) : null,
-    locked: await store.isLocked(month),
+    employerSignature: await rosterEmployerSignature(store, month, entries, users),
   };
 }

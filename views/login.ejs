@@ -17,13 +17,7 @@
       <button class="btn btn-primary btn-block" type="submit">Anmelden</button>
     </form>
     <p class="muted small" style="margin-top:16px">Passwort vergessen? Der Chef kann Ihnen ein neues Startpasswort geben.</p>
-    <% if (demoLogins) { %>
-      <div class="demo-box">
-        <strong>Demo-Zugänge</strong>
-        <p class="small" style="margin:6px 0 0">Chef: <code><%= demoLogins.chef[0] %></code> / <code><%= demoLogins.chef[1] %></code><br>
-          Mitarbeiterin: <code><%= demoLogins.employee[0] %></code> / <code><%= demoLogins.employee[1] %></code></p>
-      </div>
-    <% } %>
+
   </div>
 </div>
 <%- include('partials/footer') %>

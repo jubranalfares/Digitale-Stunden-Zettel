@@ -1,200 +1,126 @@
 # Digitale Stundenzettel
 
-Ersetzt die Papier-Stundenzettel durch ein digitales „Heft“:
+Das Papier-Heft mit den Stundenzetteln – digital. Man schreibt **direkt ins Formular**, wie auf Papier,
+nur ohne Rechnen und ohne ständiges Unterschreiben:
 
-- **Jeder Mitarbeiter** füllt seinen eigenen Stundenzettel am Handy aus – im Layout der bekannten Vorlage
-  *„Vorlage zur Dokumentation der täglichen Arbeitszeit“*. Einfach einen Tag antippen, im Fenster „von – bis“
-  eintragen, fertig: Die Stunden des Tages und die Monatssumme rechnet das System automatisch.
-- **Unterschriften werden nur einmal hinterlegt** und danach bei jedem Eintrag automatisch an der richtigen
-  Stelle eingesetzt – mit dem richtigen Datum. Kein Nachlaufen mehr, kein „am falschen Tag unterschrieben“.
-- **Der Chef** sieht alle Zettel, die **Einsatzliste** (großes Blatt mit allen Mitarbeitern) und lädt mit
-  einem Klick alles als **PDF für den Steuerberater** herunter.
+- **Mitarbeiter** tippen ihre Zeiten in ihren Stundenzettel (*„Vorlage zur Dokumentation der täglichen
+  Arbeitszeit“*) – z. B. `12` und `16`. Dauer, Monatssumme, „aufgezeichnet am“ und die **Unterschrift**
+  setzt das System automatisch. Gespeichert wird von selbst.
+- In der **Einsatzliste** (großes Blatt mit allen Mitarbeitern) schreibt man wie auf Papier `12-16` in die
+  Zelle – daraus werden 4:00 Std., die Zeile **Summe** rechnet mit.
+- **Der Chef** blättert durch das Heft (Einsatzliste, dann jeder Mitarbeiter), unterschreibt nur einmal
+  und lädt mit **einem Knopf** alles als PDF für den Steuerberater herunter.
 
-| Chef-Übersicht | Tag antippen → Erfassen am Handy |
+| Chef: das Heft mit Registern | Mitarbeiter: direkt ins Formular tippen |
 |---|---|
-| ![Chef-Übersicht](docs/chef-uebersicht.jpg) | ![Erfassung am Handy](docs/handy-erfassung.jpg) |
+| ![Chef-Ansicht](docs/chef-uebersicht.jpg) | ![Erfassung am Handy](docs/handy-erfassung.jpg) |
 
 | PDF: Stundenzettel | PDF: Einsatzliste |
 |---|---|
 | ![Stundenzettel als PDF](docs/pdf-stundenzettel.jpg) | ![Einsatzliste als PDF](docs/pdf-einsatzliste.jpg) |
 
-## Brauchen wir eine Datenbank?
+## So schreibt man ins Heft
 
-Ja – die Zeiten, Mitarbeiter und Unterschriften müssen dauerhaft und für alle gemeinsam gespeichert
-werden. Verwendet wird **SQLite** (über libSQL):
+| Wo | Eingabe | Ergebnis |
+|---|---|---|
+| Stundenzettel, Beginn/Ende | `12`, `930`, `12:30` | 12:00, 09:30, 12:30 |
+| Stundenzettel, Pause | `30`, `45`, `1`, `130` | 0:30, 0:45, 1:00, 1:30 |
+| Stundenzettel, Spalte * | K, U, UU, F, SA, SU | Kürzel laut Schlüssel |
+| Einsatzliste, Tageszelle | `12-16`, `12:30-18`, `U`, `K` | 4:00 Std. bzw. Kürzel |
+| überall | Feld leeren | Tag wird gelöscht |
 
-- **Online auf Vercel:** [Turso](https://turso.tech) – SQLite in der Cloud, im kostenlosen Tarif mehr als ausreichend.
-- **Auf eigenem Server / lokal:** eine einzige Datei (`data/stundenzettel.db`), kein Datenbank-Server nötig.
+Gespeichert wird, sobald man die Zeile bzw. Zelle verlässt (oder Enter drückt). Unten erscheint kurz
+„✓ Gespeichert · Monatssumme …“.
 
-Gesichert wird per Knopf in den Einstellungen (SQL-Datei mit allen Daten).
+Mitarbeiter schreiben in ihren eigenen Zettel und ihre eigene Spalte der Einsatzliste (laufender und
+Vormonat). Der Chef kann überall eintragen; seine Einträge werden mit **„AG“** gekennzeichnet.
 
-## Auf Vercel starten (geht komplett vom Handy)
-
-1. [vercel.com](https://vercel.com) öffnen → **mit GitHub anmelden**.
-2. **Add New… → Project** → beim Repository **Digitale-Stunden-Zettel** auf **Import** → **Deploy**.
-   (Einstellungen nicht ändern – `vercel.json` regelt alles.)
-3. Die fertige Seite öffnen: Sie zeigt „Noch eine Datenbank verbinden“. Dafür im Vercel-Projekt
-   **Storage → Create Database → Turso** wählen, kostenlosen Tarif nehmen und mit dem Projekt **verbinden**.
-4. **Deployments → oberster Eintrag → ⋯ → Redeploy**.
-5. Seite neu öffnen → **„Mit Beispieldaten ausprobieren“** (Demo-Café mit 10 Mitarbeitern) oder direkt echt einrichten.
-   Die Demo lässt sich später unter *Einstellungen → Demo beenden* restlos löschen.
-
-Falls Turso im Storage-Bereich nicht angeboten wird: auf [turso.tech](https://turso.tech) (Anmeldung mit GitHub)
-eine Datenbank anlegen und unter *Vercel → Settings → Environment Variables* die Werte
-`TURSO_DATABASE_URL` und `TURSO_AUTH_TOKEN` eintragen, dann Redeploy.
-
-Jede Änderung im GitHub-Repository wird von Vercel automatisch neu veröffentlicht.
-
-## So funktioniert es
-
-### Chef (einmalig)
-1. App aufrufen → **Ersteinrichtung**: Name des Betriebs, eigener Zugang.
-2. **Unterschrift des Arbeitgebers** einmal mit Finger/Maus hinterlegen.
-3. Unter **Mitarbeiter** alle Mitarbeiter anlegen (Name, Benutzername, Pers.-Nr., Startpasswort).
-   Optional: Logo hochladen (erscheint oben rechts auf dem Stundenzettel).
-
-### Mitarbeiter
-1. Erste Anmeldung mit dem Startpasswort → eigenes Passwort vergeben und **einmal unterschreiben**.
-2. Danach: auf **„Heute erfassen“** tippen – oder auf dem Stundenzettel bzw. in der **eigenen Spalte der
-   Einsatzliste** auf einen Tag tippen. Es öffnet sich ein Fenster: **von – bis**, Pause antippen, **Speichern**.
-   - Die Stunden des Tages (z. B. 12–16 Uhr = 4:00) werden sofort angezeigt und eingetragen.
-   - Die **Monatssumme** wird bei jedem Eintrag automatisch neu berechnet und gespeichert.
-   - „aufgezeichnet am“ und die **Unterschrift** setzt das System automatisch.
-   - Die letzten Schichten stehen als **Schnellauswahl** bereit – ein Tipp genügt.
-3. Tipp: Im Handy-Browser „Zum Startbildschirm hinzufügen“ – dann ist die App wie ein Icon verfügbar.
-
-### Chef im Alltag
-- In der **Einsatzliste** kann der Chef bei jedem Mitarbeiter einen Tag antippen und Zeiten eintragen
-  oder korrigieren (wird mit „AG“ gekennzeichnet).
-
-### Monatsende
-1. Chef öffnet **Übersicht** → sieht für jeden Mitarbeiter Tage, Stunden und Unterschriftsstatus.
-2. Optional **Monat abschließen** – danach können Mitarbeiter nichts mehr ändern.
-3. **ZIP (eine PDF je Mitarbeiter)** oder **Alles in einer PDF** herunterladen und an den Steuerberater schicken.
-
-## Wo landet welche Unterschrift – mit welchem Datum?
+## Unterschriften – einmal hinterlegen, nie wieder unterschreiben
 
 | Stelle | Unterschrift | Datum |
 |---|---|---|
 | Stundenzettel, „Unterschrift des Arbeitnehmers“ | Mitarbeiter | Tag des letzten eigenen Eintrags im Monat |
 | Stundenzettel, „Unterschrift des Arbeitgebers“ | Chef | Tag des letzten Eintrags im Monat |
-| Einsatzliste, jede Tageszelle | Mitarbeiter (neben den Stunden) | – (die Zelle gehört zu dem Tag) |
-| Einsatzliste, Zeile „Summe“ | – | Monatssumme je Mitarbeiter, automatisch |
-| Einsatzliste, unten | Chef | Tag des letzten Eintrags aller Mitarbeiter im Monat |
+| Einsatzliste, jede Tageszelle | Mitarbeiter (neben den Stunden) | – |
+| Einsatzliste, unten | Chef | Tag des letzten Eintrags aller Mitarbeiter |
 
-- Die Spalte **„aufgezeichnet am“** wird bei jedem Speichern automatisch mit dem heutigen Datum gefüllt.
-- Trägt oder ändert der **Chef** etwas für einen Mitarbeiter ein, wird die Zeile mit **„AG“** markiert und
-  nicht mit der Mitarbeiter-Unterschrift versehen. Jede Änderung steht im **Änderungsprotokoll** des Zettels.
-- Wird eine Unterschrift neu gezeichnet, behalten bereits unterschriebene Einträge ihre alte Unterschrift.
-- Mitarbeiter sehen in der Einsatzliste die Stunden der Kollegen (wie auf dem Papier), statt fremder
-  Unterschriften aber nur ein ✓. Chef und PDF zeigen alle Unterschriften.
+Mitarbeiter sehen in der Einsatzliste die Stunden der Kollegen (wie auf dem Papier), statt fremder
+Unterschriften aber nur ein ✓. Der Chef und das PDF zeigen alle Unterschriften.
+Die Unterschrift ist eine einfache elektronische Signatur; der Steuerberater akzeptiert sie.
 
-## Regeln, die die App prüft
+## Einrichtung (einmalig)
 
-- Keine Einträge für zukünftige Tage.
-- Mitarbeiter können den **laufenden und den Vormonat** bearbeiten, ältere Monate nur der Chef.
-- Abgeschlossene Monate sind gesperrt (Chef kann sie wieder öffnen).
-- Hinweise bei zu kurzer Pause (§ 4 ArbZG: > 6 Std. → 30 Min., > 9 Std. → 45 Min.), bei mehr als 10 Stunden
-  (§ 3 ArbZG) und wenn ein Tag später als 7 Tage nachgetragen wird (§ 17 MiLoG).
+1. App öffnen → **Ersteinrichtung**: Name des Betriebs und Chef-Zugang.
+2. Unter **Einstellungen** einmal als Chef unterschreiben.
+3. Unter **Mitarbeiter** jeden mit Name, Benutzername und Startpasswort anlegen.
+4. Mitarbeiter melden sich an, vergeben ein eigenes Passwort und unterschreiben einmal – fertig.
+   Tipp: im Handy-Browser „Zum Startbildschirm hinzufügen“, dann ist das Heft wie eine App da.
 
-## Zum Formular
+## Online stellen mit Vercel (geht komplett vom Handy)
 
-Beide Formulare sind den Papiervorlagen nachgebaut – Spalten, Reihenfolge, Leerzeile unter dem Kopf,
-Summe, Unterschriftszeilen und Schlüssel-Legende. Abweichungen gegenüber dem Papier:
+1. [vercel.com](https://vercel.com) öffnen → **mit GitHub anmelden**.
+2. **Add New… → Project** → beim Repository **Digitale-Stunden-Zettel** auf **Import** → **Deploy**.
+3. Die Seite zeigt „Noch eine Datenbank verbinden“: im Vercel-Projekt **Storage → Create Database → Turso**
+   wählen (kostenloser Tarif) und mit dem Projekt **verbinden**.
+4. **Deployments → oberster Eintrag → ⋯ → Redeploy** – danach Seite öffnen und einrichten.
 
-- **Einsatzliste:** Die zweite Zeile unter „Name“ bleibt wie auf dem Papier leer. Jede Tageszelle zeigt die
-  Stunden (aus von–bis berechnet) und die Unterschrift. Zusätzlich gibt es die Zeile **„Summe“**
-  (Monatsstunden je Mitarbeiter, automatisch) und unten die **Unterschrift des Arbeitgebers**.
-  Pro Blatt passen wie auf dem Papier 8 Mitarbeiter – bei mehr entstehen automatisch weitere Blätter.
-- **Stundenzettel:** Statt des „S&A“-Logos kann in den Einstellungen ein eigenes Logo hochgeladen werden.
-  Die Copyright-Zeile der Vorlage wird nicht übernommen.
+Falls Turso unter Storage nicht angeboten wird: auf [turso.tech](https://turso.tech) (Anmeldung mit GitHub)
+eine Datenbank anlegen und unter *Vercel → Settings → Environment Variables* `TURSO_DATABASE_URL` und
+`TURSO_AUTH_TOKEN` eintragen, dann Redeploy. Jede Änderung im Repository geht automatisch online.
 
-Alle Maße stehen zentral in [`src/layout.js`](src/layout.js) und gelten für Bildschirm und PDF gleichermaßen.
+### Brauchen wir eine Datenbank?
 
-## Installation
+Ja – damit alle Zettel dauerhaft und für alle gemeinsam gespeichert sind. Verwendet wird SQLite (über libSQL):
+online über [Turso](https://turso.tech), auf einem eigenen Server oder lokal als einzelne Datei
+(`data/stundenzettel.db`).
+
+### Alternative: eigener Server mit Docker
+
+```bash
+DOMAIN=stunden.eiscafe-beispiel.de docker compose up -d
+```
+
+Die Domain muss auf den Server zeigen; [Caddy](https://caddyserver.com) richtet HTTPS automatisch ein.
+
+## Lokal starten
 
 Voraussetzung: [Node.js](https://nodejs.org) ab Version 20.
 
 ```bash
 npm install
-npm start              # http://localhost:3000
+npm start            # http://localhost:3000
+npm test             # Tests
+npm run demo         # nur für Entwicklung: Beispiel-Café in eine leere Datenbank (chef/chef1234, giulia/test1234)
 ```
-
-Zum Ausprobieren mit Beispieldaten (nur in eine leere Datenbank):
-
-```bash
-npm run demo           # Chef: chef / chef1234 – Mitarbeiter: giulia, luca, … / test1234
-npm start
-```
-
-Tests: `npm test`
-
-### Alternative: eigener kleiner Server mit Docker
-
-Die App muss für die Mitarbeiter von unterwegs erreichbar sein und **unbedingt über HTTPS** laufen.
-Mit einem kleinen Server (z. B. Hetzner, IONOS, Strato – ab ca. 4–5 € im Monat) und einer Domain:
-
-```bash
-git clone <dieses-repo> && cd Digitale-Stunden-Zettel
-DOMAIN=stunden.eiscafe-beispiel.de docker compose up -d
-```
-
-Die Domain muss per DNS auf den Server zeigen; [Caddy](https://caddyserver.com) besorgt das HTTPS-Zertifikat
-automatisch. Die Datenbank liegt im Docker-Volume `stundenzettel-daten`.
-
-Alternativ läuft die App auf jedem Hoster, der Node.js oder Docker anbietet – mit Turso
-(`TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`) oder mit dauerhaftem Speicher für die Datei (`DATA_DIR`).
-Hinter einem HTTPS-Proxy `TRUST_PROXY=1` setzen.
-
-### Einstellungen (Umgebungsvariablen)
 
 | Variable | Standard | Bedeutung |
 |---|---|---|
-| `PORT` | `3000` | Port der App |
 | `TURSO_DATABASE_URL` | – | Online-Datenbank (Turso/libSQL). Ohne Angabe wird die lokale Datei genutzt |
 | `TURSO_AUTH_TOKEN` | – | Zugangsschlüssel für Turso |
 | `DATA_DIR` | `data` | Ordner der lokalen Datenbank |
-| `DB_FILE` | `$DATA_DIR/stundenzettel.db` | Pfad der Datenbankdatei (überschreibt `DATA_DIR`) |
+| `PORT` | `3000` | Port |
 | `APP_TIMEZONE` | `Europe/Berlin` | Zeitzone für „heute“ und „aufgezeichnet am“ |
-| `TRUST_PROXY` | – (auf Vercel automatisch) | Hinter einem HTTPS-Proxy auf `1` setzen |
-| `COOKIE_SECURE` | automatisch | `true` erzwingt sichere Cookies |
+| `TRUST_PROXY` | auf Vercel automatisch | Hinter einem HTTPS-Proxy auf `1` setzen |
 
-Eine `.env`-Datei (Vorlage: `.env.example`) wird mit `node --env-file=.env server.js` geladen.
+## Datensicherung
 
-## Datensicherung & Aufbewahrung
-
-- In den **Einstellungen** (Chef) gibt es „Sicherung herunterladen“ – eine SQL-Datei mit allen Daten
-  (einspielbar mit `sqlite3 neu.db < sicherung.sql` bzw. `turso db shell <name> < sicherung.sql`).
-  Empfehlung: jeden Monat nach dem Export herunterladen und zusammen mit den PDFs ablegen.
-- Arbeitszeitaufzeichnungen sind nach § 17 MiLoG **mindestens 2 Jahre** aufzubewahren. Ausgeschiedene
-  Mitarbeiter deshalb nur **deaktivieren**, nicht löschen (Löschen ist bewusst nicht vorgesehen).
-
-## Hinweis zur digitalen Unterschrift
-
-Die hinterlegte Unterschrift ist eine *einfache elektronische Signatur* (Bild der Unterschrift + Protokoll,
-wer wann was eingetragen hat). Der Steuerberater hat bestätigt, dass er die Nachweise in dieser Form akzeptiert.
+Unter **Einstellungen** (Chef) → „Sicherung herunterladen“: eine SQL-Datei mit allen Daten. Am besten
+jeden Monat zusammen mit dem PDF ablegen. Arbeitszeitnachweise mindestens **2 Jahre** aufbewahren
+(§ 17 MiLoG) – ausgeschiedene Mitarbeiter deshalb nur deaktivieren, nicht löschen.
 
 ## Technik
 
-- Node.js + Express, serverseitig gerenderte Seiten (EJS), kein Build-Schritt
-- SQLite über libSQL (`@libsql/client`): lokal als Datei, online über Turso
-- PDF-Erzeugung mit PDFKit (Vektorgrafik, A4), eingebettete Schrift *Liberation* (SIL OFL, `assets/fonts/`)
-- Sicherheit: Passwörter mit scrypt, Sitzungs-Cookies (HttpOnly, SameSite), CSRF-Schutz,
-  Schutz gegen Passwort-Raten, Content-Security-Policy
+Node.js + Express, Seiten mit EJS, SQLite über libSQL, PDFs mit PDFKit (eingebettete Schrift *Liberation*,
+SIL OFL). Beide Formulare haben ihre Maße zentral in [`src/layout.js`](src/layout.js) – Bildschirm und PDF
+sehen dadurch gleich aus.
 
 ```
-server.js            Startpunkt
-src/app.js           Express-App, Middleware
-src/routes/          Seiten: Anmeldung, Stundenzettel, Chef-Bereich, Einstellungen
-src/entries.js       Speichern/Löschen von Einträgen inkl. Regeln und Auto-Unterschrift
-src/sheets.js        Daten für Stundenzettel und Einsatzliste
-src/pdf.js           PDF-Erzeugung
-src/layout.js        Maße beider Formulare (Bildschirm + PDF)
-src/db.js, store.js  Datenbankschema und -zugriff
-src/demo.js          Beispieldaten (Demo-Modus)
-api/index.js         Einstiegspunkt für Vercel (vercel.json)
-views/               Seitenvorlagen
-public/              CSS, Browser-Skript (Unterschriftenfeld, Live-Berechnung)
-scripts/demo-data.js Beispieldaten
-test/                Tests (node --test), inkl. Online-Datenbank über einen Protokoll-Nachbau
+server.js, api/index.js   Start (lokal / Vercel)
+src/routes/heft.js        Das Heft: Formulare anzeigen, Einträge speichern, PDF
+src/routes/…              Anmeldung, Einstellungen, Mitarbeiter
+src/entries.js            Regeln beim Speichern (Rechte, automatische Unterschrift)
+src/sheets.js, pdf.js     Formulardaten und PDF-Erzeugung
+src/db.js, store.js       Datenbank
+views/, public/           Seiten, Stil, Browser-Skript (Eingabe direkt im Formular, Unterschriftenfeld)
+test/                     Tests, inkl. Online-Datenbank über einen Protokoll-Nachbau
 ```

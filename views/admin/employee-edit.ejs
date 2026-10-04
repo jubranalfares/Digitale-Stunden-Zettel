@@ -2,7 +2,7 @@
 <div class="page-head">
   <div>
     <h1><%= target.name %></h1>
-    <div class="sub"><a href="/admin/mitarbeiter">← Alle Mitarbeiter</a><% if (target.role === 'employee') { %> · <a href="/admin/zettel/<%= target.id %>">Stundenzettel ansehen</a><% } %></div>
+    <div class="sub"><a href="/admin/mitarbeiter">← Alle Mitarbeiter</a><% if (target.role === 'employee') { %> · <a href="/zettel/<%= target.id %>">Stundenzettel</a><% } %></div>
   </div>
 </div>
 
@@ -13,11 +13,10 @@
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <label>Vor- und Nachname <input name="name" value="<%= values.name %>" required></label>
     <label>Benutzername <input name="benutzername" value="<%= values.username %>" autocapitalize="none" required pattern="[A-Za-z0-9._@\-]{3,40}"></label>
-    <label>Personalnummer <input name="persnr" value="<%= values.personnel_no %>"></label>
     <label>Rolle
       <select name="rolle">
         <option value="employee" <%= values.role !== 'admin' ? 'selected' : '' %>>Mitarbeiter</option>
-        <option value="admin" <%= values.role === 'admin' ? 'selected' : '' %>>Chef/Admin</option>
+        <option value="admin" <%= values.role === 'admin' ? 'selected' : '' %>>Chef (sieht alle Zettel)</option>
       </select>
     </label>
     <label class="check"><input type="checkbox" name="einsatzliste" value="1" <%= values.on_roster ? 'checked' : '' %>> Auf der Einsatzliste führen</label>

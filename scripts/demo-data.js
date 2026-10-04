@@ -3,7 +3,7 @@
 //   node scripts/demo-data.js x.db
 import { loadConfig } from '../src/config.js';
 import { openDatabase } from '../src/db.js';
-import { seedDemo } from '../src/demo.js';
+import { seedDemo } from './demo.js';
 import { Store } from '../src/store.js';
 import { todayISO } from '../src/time.js';
 

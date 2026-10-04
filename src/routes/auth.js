@@ -2,7 +2,6 @@ import express from 'express';
 import {
   LoginThrottle, endSession, hashPassword, passwordProblem, requireLogin, startSession, verifyPassword,
 } from '../auth.js';
-import { DEMO_LOGINS, seedDemo } from '../demo.js';
 import { validImageDataUrl } from '../http.js';
 
 export default function authRoutes({ store, config }) {
@@ -12,7 +11,7 @@ export default function authRoutes({ store, config }) {
   router.get('/', async (req, res) => {
     if (!await store.countUsers()) return res.redirect('/setup');
     if (!req.user) return res.redirect('/login');
-    res.redirect(req.user.role === 'admin' ? '/admin' : '/zettel');
+    res.redirect(req.user.role === 'admin' ? '/einsatzliste' : '/zettel');
   });
 
   // ---- Ersteinrichtung (nur solange es noch keinen Benutzer gibt) -----------
@@ -45,18 +44,10 @@ export default function authRoutes({ store, config }) {
     res.redirect('/einstellungen?willkommen=1#unterschrift');
   });
 
-  // Zum Ausprobieren: Beispielbetrieb mit 10 Mitarbeitern anlegen und als Chef anmelden.
-  router.post('/setup/demo', async (req, res) => {
-    if (await store.countUsers()) return res.redirect('/login');
-    const chefId = await seedDemo(store, { today: req.today });
-    await startSession(req, res, store, config, chefId);
-    res.redirect('/admin');
-  });
-
   // ---- Anmeldung ------------------------------------------------------------
 
   const renderLogin = (res, { username = '', error = null, status = 200 } = {}) => res.status(status).render('login', {
-    title: 'Anmelden', username, error, demoLogins: res.locals.settings.demo ? DEMO_LOGINS : null,
+    title: 'Anmelden', username, error,
   });
 
   router.get('/login', async (req, res) => {
