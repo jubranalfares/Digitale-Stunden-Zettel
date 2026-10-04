@@ -16,7 +16,6 @@ const MIGRATIONS = [
     password_hash        TEXT NOT NULL,
     role                 TEXT NOT NULL CHECK (role IN ('admin', 'employee')),
     name                 TEXT NOT NULL,
-    personnel_no         TEXT NOT NULL DEFAULT '',
     on_roster            INTEGER NOT NULL DEFAULT 1,
     active               INTEGER NOT NULL DEFAULT 1,
     must_change_password INTEGER NOT NULL DEFAULT 0,
@@ -52,12 +51,6 @@ const MIGRATIONS = [
   );
   CREATE INDEX entries_by_date ON entries (work_date);
 
-  CREATE TABLE month_locks (
-    month     TEXT PRIMARY KEY,
-    locked_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    locked_by INTEGER
-  );
-
   CREATE TABLE sessions (
     id_hash    TEXT PRIMARY KEY,
     user_id    INTEGER NOT NULL,
@@ -66,19 +59,41 @@ const MIGRATIONS = [
     expires_at INTEGER NOT NULL
   );
 
-  CREATE TABLE audit_log (
-    id         INTEGER PRIMARY KEY,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    actor_id   INTEGER,
-    user_id    INTEGER,
-    work_date  TEXT,
-    action     TEXT NOT NULL,
-    data       TEXT
+  `,
+  `
+  ALTER TABLE entries ADD COLUMN employer_signature_id INTEGER;
+  UPDATE entries SET employer_signature_id = (
+    SELECT id FROM signatures WHERE kind = 'employer' AND created_at <= entries.created_at
+    ORDER BY created_at DESC, id DESC LIMIT 1
   );
   `,
 ];
 
 export const isLocalUrl = (url) => url === ':memory:' || url.startsWith('file:');
+
+// Lokales libSQL arbeitet synchron. Eine zweite Verbindung darf deshalb nicht
+// auf eine Schreibtransaktion warten, deren Fortsetzung denselben Event-Loop braucht.
+// Pro Datei wird die gesamte Transaktion eingereiht; Turso verwaltet seine Sperren selbst.
+const localQueues = new Map();
+async function serializeLocal(key, fn) {
+  const previous = localQueues.get(key) ?? Promise.resolve();
+  const result = previous.then(fn);
+  const tail = result.catch(() => {});
+  localQueues.set(key, tail);
+  try { return await result; }
+  finally { if (localQueues.get(key) === tail) localQueues.delete(key); }
+}
+
+// SQLite meldet bei parallelen Schreibzugriffen sicher "nicht ausgeführt".
+// Nur diesen Fall wiederholen; Netzwerk-/Commit-Fehler niemals blind wiederholen.
+async function retryBusy(fn) {
+  for (let attempt = 0; ; attempt++) {
+    try { return await fn(); } catch (error) {
+      if (attempt >= 5 || !['SQLITE_BUSY', 'SQLITE_LOCKED'].includes(error.code)) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 20 * (attempt + 1)));
+    }
+  }
+}
 
 // Benannte Parameter (@name) in einfache ?-Parameter umwandeln – funktioniert lokal und online gleich.
 function statement(sql, args = []) {
@@ -93,12 +108,13 @@ function statement(sql, args = []) {
 
 // Dünne Hülle um den libSQL-Client mit den Abfragen, die die App braucht.
 export class Database {
-  constructor(client) {
+  constructor(client, schedule = (fn) => fn()) {
     this.client = client;
+    this.schedule = schedule;
   }
 
   async all(sql, args) {
-    return (await this.client.execute(statement(sql, args))).rows;
+    return this.schedule(async () => (await retryBusy(() => this.client.execute(statement(sql, args)))).rows);
   }
 
   async get(sql, args) {
@@ -106,30 +122,50 @@ export class Database {
   }
 
   async run(sql, args) {
-    const r = await this.client.execute(statement(sql, args));
-    return { changes: r.rowsAffected, lastId: r.lastInsertRowid == null ? null : Number(r.lastInsertRowid) };
+    return this.schedule(async () => {
+      const r = await retryBusy(() => this.client.execute(statement(sql, args)));
+      return { changes: r.rowsAffected, lastId: r.lastInsertRowid == null ? null : Number(r.lastInsertRowid) };
+    });
   }
 
   // Mehrere Anweisungen atomar (alle oder keine).
   async batch(statements) {
-    return this.client.batch(statements.map(([sql, args]) => statement(sql, args)), 'write');
+    return this.schedule(() => this.client.batch(statements.map(([sql, args]) => statement(sql, args)), 'write'));
+  }
+
+  async transaction(fn, mode = 'write') {
+    return this.schedule(async () => {
+      const tx = await retryBusy(() => this.client.transaction(mode));
+      try {
+        const result = await fn(new Database(tx));
+        await tx.commit();
+        return result;
+      } catch (error) {
+        if (!tx.closed) await tx.rollback();
+        throw error;
+      } finally {
+        tx.close();
+      }
+    });
   }
 
   async migrate() {
-    await this.client.execute('CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)');
-    const row = await this.get('SELECT version FROM schema_version');
-    const current = row ? Number(row.version) : 0;
-    for (let v = current; v < MIGRATIONS.length; v++) {
-      // "IF NOT EXISTS", damit zwei gleichzeitig startende Server (z. B. auf Vercel) sich nicht stören.
-      const statements = MIGRATIONS[v].split(/;\s*\n/)
-        .map((s) => s.replace(/--.*$/gm, '').trim()).filter(Boolean)
-        .map((s) => s.replace(/^CREATE (TABLE|INDEX) (?!IF NOT EXISTS)/, 'CREATE $1 IF NOT EXISTS '));
-      await this.batch([
-        ...statements.map((s) => [s]),
-        ['DELETE FROM schema_version'],
-        ['INSERT INTO schema_version (version) VALUES (?)', [v + 1]],
-      ]);
-    }
+    await this.run('CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)');
+    // Die Versionsprüfung gehört in dieselbe Schreibtransaktion wie die Migration.
+    // Das verhindert doppelte ALTER TABLE bei parallelen Serverless-Kaltstarts.
+    await this.transaction(async (db) => {
+      const row = await db.get('SELECT version FROM schema_version');
+      const current = row ? Number(row.version) : 0;
+      for (let v = current; v < MIGRATIONS.length; v++) {
+        // "IF NOT EXISTS", damit zwei gleichzeitig startende Server (z. B. auf Vercel) sich nicht stören.
+        const statements = MIGRATIONS[v].split(/;\s*\n/)
+          .map((s) => s.replace(/--.*$/gm, '').trim()).filter(Boolean)
+          .map((s) => s.replace(/^CREATE (TABLE|INDEX) (?!IF NOT EXISTS)/, 'CREATE $1 IF NOT EXISTS '));
+        for (const sql of statements) await db.run(sql);
+        await db.run('DELETE FROM schema_version');
+        await db.run('INSERT INTO schema_version (version) VALUES (?)', [v + 1]);
+      }
+    });
   }
 
   close() {
@@ -139,19 +175,23 @@ export class Database {
 
 export async function openDatabase({ dbUrl, dbAuthToken }) {
   let client;
+  let schedule;
   if (isLocalUrl(dbUrl)) {
     if (dbUrl.startsWith('file:')) fs.mkdirSync(path.dirname(dbUrl.slice(5)), { recursive: true });
     const { createClient } = await import('@libsql/client');
-    client = createClient({ url: dbUrl });
-    await client.execute('PRAGMA journal_mode = WAL').catch(() => {});
-    await client.execute('PRAGMA busy_timeout = 5000').catch(() => {});
+    client = createClient({ url: dbUrl, timeout: 100 });
+    const key = dbUrl === ':memory:' ? Symbol('memory') : path.resolve(dbUrl.slice(5));
+    schedule = (fn) => serializeLocal(key, fn);
   } else {
     // Reiner HTTP-Client ohne native Module – ideal für Vercel & Co.
     const { createClient } = await import('@libsql/client/web');
     client = createClient({ url: dbUrl, authToken: dbAuthToken });
   }
-  const db = new Database(client);
-  await db.migrate();
+  const db = new Database(client, schedule);
+  try {
+    if (isLocalUrl(dbUrl)) await db.run('PRAGMA journal_mode = WAL');
+    await db.migrate();
+  } catch (error) { db.close(); throw error; }
   return db;
 }
 
@@ -178,6 +218,8 @@ export class LazyDatabase {
   async run(...args) { return (await this.ready()).run(...args); }
 
   async batch(...args) { return (await this.ready()).batch(...args); }
+
+  async transaction(...args) { return (await this.ready()).transaction(...args); }
 
   async close() {
     if (this.promise) (await this.promise).close();

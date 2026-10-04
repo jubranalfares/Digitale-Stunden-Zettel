@@ -5,3 +5,6 @@ data
 .git
 .env
 test
+test-results
+playwright-report
+docs

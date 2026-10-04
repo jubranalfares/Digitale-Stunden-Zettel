@@ -196,10 +196,10 @@ input[type="checkbox"] { display: inline-block; width: 20px; min-height: 20px; h
 /* ---- Papierformulare --------------------------------------------------------
    Alle Maße kommen in pt aus src/layout.js; --pt rechnet sie auf die Bildschirmbreite um. */
 
-@font-face { font-family: "Paper Sans"; src: local("Arial"), local("Liberation Sans"), url("/fonts/LiberationSans-Regular.ttf") format("truetype"); font-weight: 400; }
-@font-face { font-family: "Paper Sans"; src: local("Arial Bold"), local("Arial-BoldMT"), local("Liberation Sans Bold"), url("/fonts/LiberationSans-Bold.ttf") format("truetype"); font-weight: 700; }
-@font-face { font-family: "Paper Serif"; src: local("Times New Roman"), local("TimesNewRomanPSMT"), local("Liberation Serif"), url("/fonts/LiberationSerif-Regular.ttf") format("truetype"); font-weight: 400; }
-@font-face { font-family: "Paper Serif"; src: local("Times New Roman Bold"), local("TimesNewRomanPS-BoldMT"), local("Liberation Serif Bold"), url("/fonts/LiberationSerif-Bold.ttf") format("truetype"); font-weight: 700; }
+@font-face { font-family: "Paper Sans"; src: url("/fonts/LiberationSans-Regular.ttf") format("truetype"); font-weight: 400; }
+@font-face { font-family: "Paper Sans"; src: url("/fonts/LiberationSans-Bold.ttf") format("truetype"); font-weight: 700; }
+@font-face { font-family: "Paper Serif"; src: url("/fonts/LiberationSerif-Regular.ttf") format("truetype"); font-weight: 400; }
+@font-face { font-family: "Paper Serif"; src: url("/fonts/LiberationSerif-Bold.ttf") format("truetype"); font-weight: 700; }
 
 .paper-wrap { container-type: inline-size; max-width: 860px; margin: 0 auto; }
 .paper-wrap + .paper-wrap { margin-top: 24px; }
@@ -303,14 +303,12 @@ code { background: #f0eee8; padding: 1px 5px; border-radius: 4px; font-size: .9e
 @media (max-width: 900px) {
   /* Formular auf dem Handy groß genug zum Reinschreiben, seitlich verschiebbar */
   .paper-scroll { overflow-x: auto; margin: 0 -12px; padding: 0 12px 8px; -webkit-overflow-scrolling: touch; }
-  .paper-scroll .paper-wrap { min-width: 820px; }
-  .roster-scroll .paper-wrap { min-width: 880px; }
+  .paper-scroll .paper-wrap { min-width: 1120px; }
+  .roster-scroll .paper-wrap { min-width: 1120px; }
 }
 
 /* ---- Mobil ------------------------------------------------------------------ */
 
-@media (max-width: 900px) {
-  }
 
 @media (max-width: 640px) {
   .container { padding: 14px 12px 40px; }
@@ -333,4 +331,18 @@ code { background: #f0eee8; padding: 1px 5px; border-radius: 4px; font-size: .9e
   body { background: #fff; }
   .container { padding: 0; max-width: none; }
   .paper { box-shadow: none; }
+}
+
+/* Eingabegröße ohne Änderung der A4-Geometrie; kleine Displays verschieben das Blatt. */
+.roster-table td.cell-error .rc { visibility: hidden; }
+.roster-table td.cell-error .rc-in { color: var(--danger); background: var(--danger-soft); }
+a[data-busy] { opacity: .6; cursor: wait; }
+@media print {
+  @page { size: A4 portrait; margin: 0; }
+  .heft-top, .heft-tabs, .heft-hint, .toast { display: none !important; }
+  .paper-scroll { overflow: visible; margin: 0; padding: 0; }
+  .paper-scroll .paper-wrap { min-width: 0; width: 210mm; max-width: none; }
+  .paper { width: 210mm; height: 297mm; break-after: page; --pt: 0.352778mm; }
+  .paper tr.today td, .paper td.own, .paper tr[data-row]:hover td { background: white; }
+  .paper input.rc-in { display: none; }
 }

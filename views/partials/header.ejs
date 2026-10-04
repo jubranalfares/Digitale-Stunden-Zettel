@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#16302f">
   <title><%= title ? `${title} · ` : '' %>Stundenzettel<%= settings.company_name ? ` · ${settings.company_name}` : '' %></title>
   <link rel="stylesheet" href="/static/css/app.css">
@@ -15,7 +15,7 @@
 %>
 <header class="topbar">
   <a class="brand" href="/">
-    <span class="brand-mark" aria-hidden="true">⏱</span>
+    <img class="brand-mark" src="/static/icon.svg" alt="" width="34" height="34">
     <span>Stundenzettel<small><%= settings.company_name %></small></span>
   </a>
   <nav aria-label="Hauptnavigation">

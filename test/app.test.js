@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { after, before, test } from 'node:test';
-import { signaturePng } from '../scripts/demo.js';
+import { signaturePng } from './helpers/signature.js';
 import { createApp } from '../src/app.js';
 import { openDatabase } from '../src/db.js';
 import { Store } from '../src/store.js';
@@ -79,6 +79,7 @@ const day = (iso) => ({ datum: iso, beginn: '', pause: '', ende: '', kuerzel: ''
 
 test('Ersteinrichtung legt den Chef an', async () => {
   assert.equal((await chef.get('/')).location, '/setup');
+  await chef.get('/setup');
   const res = await chef.post('/setup', {
     firma: 'Eiscafé Taormina', name: 'Chef', benutzername: 'chef', passwort: 'geheim123', passwort2: 'geheim123',
   });
@@ -101,6 +102,7 @@ test('Chef unterschreibt einmal und legt eine Mitarbeiterin an', async () => {
 });
 
 test('Erste Anmeldung: eigenes Passwort und Unterschrift', async () => {
+  await anna.get('/login');
   assert.equal((await anna.post('/login', { benutzername: 'anna', passwort: 'start1234' })).location, '/');
   assert.equal((await anna.get('/zettel')).location, '/willkommen');
   await anna.get('/willkommen');
@@ -235,7 +237,9 @@ test('Datensicherung', async () => {
 });
 
 test('Falsches Passwort wird abgelehnt', async () => {
-  const res = await new Client().post('/login', { benutzername: 'anna', passwort: 'falsch' });
+  const client = new Client();
+  await client.get('/login');
+  const res = await client.post('/login', { benutzername: 'anna', passwort: 'falsch' });
   assert.equal(res.status, 401);
 });
 

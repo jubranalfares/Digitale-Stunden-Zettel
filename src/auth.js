@@ -25,6 +25,7 @@ export async function verifyPassword(password, stored) {
 
 export function passwordProblem(password) {
   if (String(password).length < 8) return 'Das Passwort muss mindestens 8 Zeichen lang sein.';
+  if (String(password).length > 256) return 'Das Passwort darf höchstens 256 Zeichen lang sein.';
   return null;
 }
 
@@ -45,7 +46,9 @@ function parseCookies(header = '') {
     const i = part.indexOf('=');
     if (i < 0) continue;
     const key = part.slice(0, i).trim();
-    if (key) out[key] = decodeURIComponent(part.slice(i + 1).trim());
+    if (key) {
+      try { out[key] = decodeURIComponent(part.slice(i + 1).trim()); } catch { /* ungültiges Cookie ignorieren */ }
+    }
   }
   return out;
 }
@@ -59,11 +62,15 @@ function cookieOptions(req, config) {
   };
 }
 
-export async function startSession(req, res, store, config, userId) {
+export async function startSession(req, res, store, config, userId = 0) {
   const token = crypto.randomBytes(32).toString('base64url');
-  const expiresAt = Date.now() + SESSION_DAYS * DAY_MS;
-  await store.createSession(sha256(token), userId, crypto.randomBytes(24).toString('base64url'), expiresAt);
-  res.cookie(SESSION_COOKIE, token, { ...cookieOptions(req, config), maxAge: SESSION_DAYS * DAY_MS });
+  const maxAge = userId ? SESSION_DAYS * DAY_MS : 20 * 60 * 1000;
+  const expiresAt = Date.now() + maxAge;
+  const session = { id_hash: sha256(token), user_id: userId, csrf_token: crypto.randomBytes(24).toString('base64url'), expires_at: expiresAt };
+  await store.createSession(session.id_hash, userId, session.csrf_token, expiresAt);
+  if (req.session) await store.deleteSession(req.session.id_hash);
+  res.cookie(SESSION_COOKIE, token, { ...cookieOptions(req, config), maxAge });
+  return session;
 }
 
 export async function endSession(req, res, store, config) {
@@ -77,14 +84,17 @@ export function sessionMiddleware(store, config) {
     req.session = null;
     const token = parseCookies(req.headers.cookie)[SESSION_COOKIE];
     const found = token ? await store.getSessionWithUser(sha256(token)) : null;
-    if (found?.user.active) {
+    if (found && (found.user?.active || found.session.user_id === 0)) {
       req.session = found.session;
       req.user = found.user;
       // Gleitende Verlängerung, damit Mitarbeiter auf dem Handy angemeldet bleiben.
-      if (found.session.expires_at - Date.now() < (SESSION_DAYS - 1) * DAY_MS) {
+      if (found.user && found.session.expires_at - Date.now() < (SESSION_DAYS - 1) * DAY_MS) {
         await store.touchSession(found.session.id_hash, Date.now() + SESSION_DAYS * DAY_MS);
         res.cookie(SESSION_COOKIE, token, { ...cookieOptions(req, config), maxAge: SESSION_DAYS * DAY_MS });
       }
+    }
+    if (!req.session && req.method === 'GET' && ['/login', '/setup'].includes(req.path)) {
+      req.session = await startSession(req, res, store, config);
     }
 
     // Flash-Meldungen überleben genau eine Weiterleitung.
@@ -104,16 +114,20 @@ export function sessionMiddleware(store, config) {
 }
 
 export function csrfProtection(req, res, next) {
-  if (req.method !== 'POST' || !req.session) return next();
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
   const sent = Buffer.from(String(req.body?._csrf ?? ''));
-  const expected = Buffer.from(req.session.csrf_token);
-  if (sent.length === expected.length && crypto.timingSafeEqual(sent, expected)) return next();
+  const expected = Buffer.from(req.session?.csrf_token ?? '');
+  if (expected.length > 0 && sent.length === expected.length && crypto.timingSafeEqual(sent, expected)) return next();
+  if (req.get('Accept')?.includes('application/json')) return res.status(403).json({ error: 'Sitzung abgelaufen – bitte neu anmelden.' });
   res.status(403).render('error', { title: 'Sitzung abgelaufen', message: 'Bitte laden Sie die Seite neu und versuchen Sie es noch einmal.' });
 }
 
 export function requireLogin(req, res, next) {
-  if (!req.user) return res.redirect('/login');
+  if (!req.user) return req.get('Accept')?.includes('application/json')
+    ? res.status(401).json({ error: 'Bitte erneut anmelden.' }) : res.redirect('/login');
   if (req.user.must_change_password && !req.path.startsWith('/willkommen')) return res.redirect('/willkommen');
+  if (req.user.role === 'admin' && !res.locals.settings.employer_signature_id
+      && !req.path.startsWith('/einstellungen')) return res.redirect('/einstellungen?willkommen=1#unterschrift');
   next();
 }
 
@@ -132,28 +146,37 @@ export function requireEmployee(req, res, next) {
 // ---- Schutz gegen Passwort-Raten -------------------------------------------
 
 export class LoginThrottle {
-  constructor({ maxAttempts = 5, lockMs = 5 * 60 * 1000 } = {}) {
+  constructor({ store, maxAttempts = 5, lockMs = 5 * 60 * 1000 } = {}) {
+    this.store = store;
     this.maxAttempts = maxAttempts;
     this.lockMs = lockMs;
-    this.attempts = new Map();
   }
 
-  isBlocked(key) {
-    const a = this.attempts.get(key);
-    if (!a) return false;
-    if (a.until && a.until > Date.now()) return true;
-    if (a.until) this.attempts.delete(key);
+  key(value) { return `login:${sha256(value)}`; }
+
+  async isBlocked(keys) {
+    for (const key of keys) {
+      const row = await this.store.db.get('SELECT value FROM settings WHERE key = ?', [this.key(key)]);
+      if (row && JSON.parse(row.value).until > Date.now()) return true;
+    }
     return false;
   }
 
-  fail(key) {
-    const a = this.attempts.get(key) ?? { count: 0, until: 0 };
-    a.count += 1;
-    if (a.count >= this.maxAttempts) a.until = Date.now() + this.lockMs;
-    this.attempts.set(key, a);
+  fail(keys) {
+    return this.store.atomic(async (store) => {
+      const now = Date.now();
+      await store.db.run("DELETE FROM settings WHERE key LIKE 'login:%' AND json_extract(value, '$.expiresAt') <= ?", [now]);
+      for (const key of keys) {
+        const row = await store.db.get('SELECT value FROM settings WHERE key = ?', [this.key(key)]);
+        const a = row ? JSON.parse(row.value) : { count: 0, until: 0, expiresAt: now + this.lockMs };
+        a.count += 1;
+        if (a.count >= this.maxAttempts) a.until = a.expiresAt = now + this.lockMs;
+        await store.setSetting(this.key(key), JSON.stringify(a));
+      }
+    });
   }
 
-  reset(key) {
-    this.attempts.delete(key);
+  async reset(key) {
+    await this.store.db.run('DELETE FROM settings WHERE key = ?', [this.key(key)]);
   }
 }

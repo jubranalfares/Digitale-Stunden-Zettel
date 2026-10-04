@@ -22,10 +22,8 @@ export default function adminRoutes({ store }) {
   // ---- Mitarbeiterverwaltung -----------------------------------------------
 
   const readUserForm = (body) => ({
-    name: String(body.name ?? '').trim(),
+    name: String(body.name ?? '').trim().slice(0, 80),
     username: String(body.benutzername ?? '').trim(),
-    role: body.rolle === 'admin' ? 'admin' : 'employee',
-    on_roster: body.einsatzliste ? 1 : 0,
   });
 
   const userFormProblem = async (values, excludeId = null) => {
@@ -89,7 +87,7 @@ export default function adminRoutes({ store }) {
   });
 
   router.post('/mitarbeiter/:id', loadUser, async (req, res) => {
-    const values = { ...readUserForm(req.body), active: req.body.aktiv ? 1 : 0 };
+    const values = { ...readUserForm(req.body), role: req.target.role, active: req.body.aktiv ? 1 : 0 };
     let error = await userFormProblem(values, req.target.id);
     const losesAdmin = req.target.role === 'admin' && req.target.active && (values.role !== 'admin' || !values.active);
     if (!error && losesAdmin && await activeAdminCount() <= 1) error = 'Es muss mindestens ein aktiver Chef bestehen bleiben.';

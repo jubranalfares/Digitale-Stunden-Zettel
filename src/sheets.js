@@ -3,11 +3,32 @@ import {
   daysInMonth, formatClock, formatDateDE, formatDecimalHours, formatDuration, isoDate, monthKey, monthLabel, weekday,
 } from './time.js';
 
-const maxDate = (dates) => dates.filter(Boolean).sort().at(-1) ?? null;
+const lastEntry = (entries) => entries.reduce((a, e) => !a ||
+  `${e.recorded_on}|${e.updated_at}|${e.work_date}|${String(e.id).padStart(12, '0')}` >
+  `${a.recorded_on}|${a.updated_at}|${a.work_date}|${String(a.id).padStart(12, '0')}` ? e : a, null);
 
 function signatureBlock(signature, date) {
   if (!signature || !date) return null;
   return { id: signature.id, image: signature.image, date, dateLabel: formatDateDE(date) };
+}
+
+// Ein Monats-Snapshot benötigt nur vier Datenbankabfragen. Die PDF-Erzeugung
+// findet danach außerhalb der Turso-Transaktion statt, auch bei vielen Mitarbeitern.
+export async function loadMonthSnapshot(store, month) {
+  return store.atomic(async (tx) => {
+    const settings = await tx.getSettings();
+    const entries = await tx.listMonthEntries(month);
+    const employees = await tx.employeesForMonth(month);
+    const images = await tx.getSignatureImages(entries.flatMap((e) => [e.signature_id, e.employer_signature_id]));
+    return {
+      getSettings: () => settings,
+      listEntries: (id) => entries.filter((e) => e.user_id === id),
+      listMonthEntries: () => entries,
+      employeesForMonth: () => employees,
+      getSignatureImages: () => images,
+      getSignature: (id) => images.has(Number(id)) ? { id: Number(id), image: images.get(Number(id)) } : null,
+    };
+  }, 'read');
 }
 
 // Eine Zeile des Stundenzettels.
@@ -66,15 +87,15 @@ export async function buildEmployeeSheet(store, employee, ym) {
 
   // Mitarbeiter-Unterschrift: die Unterschrift des zuletzt selbst erfassten Eintrags, datiert auf diesen Tag.
   const signed = entries.filter((e) => e.signature_id && e.recorded_by === employee.id);
-  const lastSigned = signed.reduce((a, e) => (!a || e.recorded_on >= a.recorded_on ? e : a), null);
+  const lastSigned = lastEntry(signed);
   const employeeSignature = lastSigned
     ? signatureBlock(await store.getSignature(lastSigned.signature_id), lastSigned.recorded_on)
     : null;
 
   // Arbeitgeber-Unterschrift: datiert auf den letzten Eintrag des Monats (inkl. Korrekturen durch den Chef).
-  const lastRecorded = maxDate(entries.map((e) => e.recorded_on));
+  const lastRecorded = lastEntry(entries);
   const employerSignature = lastRecorded
-    ? signatureBlock(await store.employerSignatureAt(lastRecorded), lastRecorded)
+    ? signatureBlock(await store.getSignature(lastRecorded.employer_signature_id), lastRecorded.recorded_on)
     : null;
 
   return {
@@ -83,7 +104,7 @@ export async function buildEmployeeSheet(store, employee, ym) {
     monthLabel: monthLabel(ym),
     company: settings.company_name,
     logo: settings.logo,
-    employee: { id: employee.id, name: employee.name, personnelNo: employee.personnel_no },
+    employee: { id: employee.id, name: employee.name, personnelNo: '' },
     rows,
     entries,
     totalMinutes,
@@ -98,22 +119,22 @@ export async function buildEmployeeSheet(store, employee, ym) {
 export const ROSTER_COLUMNS = 8;
 
 async function rosterEmployees(store, month) {
-  return (await store.employeesForMonth(month)).filter((u) => u.on_roster);
+  return store.employeesForMonth(month);
 }
 
 // Unterschrift des Arbeitgebers unten auf der Einsatzliste: datiert auf den letzten Eintrag aller Mitarbeiter.
 export async function rosterEmployerSignature(store, month, entries, users) {
   const ids = new Set((users ?? await rosterEmployees(store, month)).map((u) => u.id));
   const all = entries ?? await store.listMonthEntries(month);
-  const lastRecorded = maxDate(all.filter((e) => ids.has(e.user_id)).map((e) => e.recorded_on));
-  return lastRecorded ? signatureBlock(await store.employerSignatureAt(lastRecorded), lastRecorded) : null;
+  const lastRecorded = lastEntry(all.filter((e) => ids.has(e.user_id)));
+  return lastRecorded ? signatureBlock(await store.getSignature(lastRecorded.employer_signature_id), lastRecorded.recorded_on) : null;
 }
 
-export async function buildRoster(store, ym) {
+export async function buildRoster(store, ym, { onlyWithEntries = false } = {}) {
   const month = monthKey(ym);
   const settings = await store.getSettings();
   const entries = await store.listMonthEntries(month);
-  const users = await rosterEmployees(store, month);
+  const users = (await rosterEmployees(store, month)).filter((u) => !onlyWithEntries || u.entry_count > 0);
 
   // Alle benötigten Unterschriften auf einmal laden
   const images = await store.getSignatureImages(entries.map((e) => e.signature_id));

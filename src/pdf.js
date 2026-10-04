@@ -5,7 +5,7 @@ import { DATEV, PAGE, ROSTER } from './layout.js';
 import { CODES } from './time.js';
 
 // Eingebettete Schriften (Liberation, SIL OFL) decken auch Namen wie „Ayşe Yılmaz“ ab.
-// Fehlen die Dateien, wird auf die PDF-Standardschriften zurückgegriffen.
+// Fehlende Fonts sind ein Fehler: kein stiller Rückfall auf Schriften ohne türkische Zeichen.
 const FONT_DIR = new URL('../assets/fonts/', import.meta.url);
 const FONTS = {
   Sans: ['LiberationSans-Regular.ttf', 'Helvetica'],
@@ -13,13 +13,8 @@ const FONTS = {
   Serif: ['LiberationSerif-Regular.ttf', 'Times-Roman'],
   'Serif-Bold': ['LiberationSerif-Bold.ttf', 'Times-Bold'],
 };
-const fontData = Object.fromEntries(Object.entries(FONTS).map(([name, [file, fallback]]) => {
-  try {
-    return [name, fs.readFileSync(new URL(file, FONT_DIR))];
-  } catch {
-    return [name, fallback];
-  }
-}));
+const fontData = Object.fromEntries(Object.entries(FONTS).map(([name, [file]]) =>
+  [name, fs.readFileSync(new URL(file, FONT_DIR))]));
 
 export function createPdf(title) {
   const doc = new PDFDocument({
@@ -55,20 +50,18 @@ function fitSize(doc, text, font, size, maxW, minSize = 5) {
 function cellText(doc, text, x, y, w, h, { font, size, align = 'center', color = '#000', pad = 2, shrink = true }) {
   if (text == null || text === '') return;
   const s = shrink ? fitSize(doc, String(text), font, size, w - 2 * pad) : size;
+  doc.save().rect(x, y, w, h).clip();
   doc.font(font).fontSize(s).fillColor(color);
   const lh = doc.currentLineHeight();
   doc.text(String(text), x + pad, y + (h - lh) / 2 + s * 0.06, {
     width: w - 2 * pad, align, lineBreak: false,
   });
+  doc.restore();
 }
 
 function drawImage(doc, src, x, y, w, h, align = 'center') {
   if (!src) return;
-  try {
-    doc.image(src, x, y, { fit: [w, h], align, valign: 'bottom' });
-  } catch {
-    // Ein defektes Bild soll nie den Export verhindern.
-  }
+  doc.image(src, x, y, { fit: [w, h], align, valign: 'bottom' });
 }
 
 function hLine(doc, x1, x2, y, width = 0.6) {
@@ -120,6 +113,7 @@ export function drawEmployeeSheet(doc, sheet) {
   sheet.rows.forEach((row, i) => {
     const y = rowTop(i + 1);
     const h = T.rowH;
+    if (!row.exists) doc.rect(L.left, y, L.width, h).fill('#f1f1f1');
     const c = Object.fromEntries(T.cols.map((col) => [col.key, col]));
     const body = { font: L.font, size: T.bodySize };
     cellText(doc, String(row.day), c.day.x, y, c.day.w, h, body);
@@ -155,7 +149,7 @@ export function drawEmployeeSheet(doc, sheet) {
   const cDur = T.cols.find((c) => c.key === 'duration');
   doc.font(L.fontBold).fontSize(L.summe.size).fillColor('#000')
     .text('Summe:', cEnd.x - 30, L.summe.y, { width: cEnd.w + 22, align: 'right', lineBreak: false });
-  doc.font(L.fontBold).fontSize(9).text(sheet.totalMinutes ? sheet.total : '', cDur.x, L.summe.y - 1, { width: cDur.w, align: 'center', lineBreak: false });
+  doc.font(L.fontBold).fontSize(9).text(sheet.entries.length ? sheet.total : '', cDur.x, L.summe.y - 1, { width: cDur.w, align: 'center', lineBreak: false });
   hLine(doc, cDur.x + 2, cDur.x + cDur.w - 2, L.summe.y + 10.5, 0.8);
   hLine(doc, cDur.x + 2, cDur.x + cDur.w - 2, L.summe.y + 12.6, 0.8);
 

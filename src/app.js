@@ -53,6 +53,7 @@ export function createApp({ config, db = new LazyDatabase(config) }) {
   // Standardwerte für alle Seiten (auch Fehlerseiten, die vor der Sitzungsprüfung entstehen).
   app.use((req, res, next) => {
     req.today = todayISO(config.timeZone);
+    res.set('Cache-Control', 'private, no-store');
     Object.assign(res.locals, {
       today: req.today, settings: { ...DEFAULT_SETTINGS }, currentPath: req.path, title: '',
       user: null, flash: null, csrfToken: '',
@@ -87,7 +88,7 @@ export function createApp({ config, db = new LazyDatabase(config) }) {
     const signature = await store.getSignature(Number(req.params.id));
     const allowed = signature && (req.user.role === 'admin' || signature.kind === 'employer' || signature.user_id === req.user.id);
     if (!allowed) return res.status(404).end();
-    sendDataUrl(res, signature.image, 'private, max-age=31536000, immutable');
+    sendDataUrl(res, signature.image, 'private, no-store');
   });
 
   app.get('/logo', requireLogin, (req, res) => {

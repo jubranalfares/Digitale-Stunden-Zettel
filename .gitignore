@@ -5,3 +5,5 @@ data/
 *.db-wal
 .env
 .vercel
+test-results/
+playwright-report/

@@ -13,15 +13,8 @@
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <label>Vor- und Nachname <input name="name" value="<%= values.name %>" required></label>
     <label>Benutzername <input name="benutzername" value="<%= values.username %>" autocapitalize="none" required pattern="[A-Za-z0-9._@\-]{3,40}"></label>
-    <label>Rolle
-      <select name="rolle">
-        <option value="employee" <%= values.role !== 'admin' ? 'selected' : '' %>>Mitarbeiter</option>
-        <option value="admin" <%= values.role === 'admin' ? 'selected' : '' %>>Chef (sieht alle Zettel)</option>
-      </select>
-    </label>
-    <label class="check"><input type="checkbox" name="einsatzliste" value="1" <%= values.on_roster ? 'checked' : '' %>> Auf der Einsatzliste führen</label>
     <label class="check"><input type="checkbox" name="aktiv" value="1" <%= values.active ? 'checked' : '' %>> Aktiv (darf sich anmelden)</label>
-    <p class="full muted small" style="margin:0">Ausgeschiedene Mitarbeiter bitte nur deaktivieren – ihre Stundenzettel bleiben für die Aufbewahrungspflicht erhalten.</p>
+    <p class="full muted small" style="margin:0">Ausgeschiedene Mitarbeiter nur deaktivieren. Ihre Einträge und Unterschriften bleiben erhalten; es gibt keine automatische Löschung.</p>
     <div class="full form-actions"><button class="btn btn-primary" type="submit">Speichern</button></div>
   </form>
 </div>

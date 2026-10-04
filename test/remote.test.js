@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { after, before, test } from 'node:test';
 import { createApp } from '../src/app.js';
+import { signaturePng } from './helpers/signature.js';
 import { loadConfig } from '../src/config.js';
 import { startHranaMock } from './helpers/hrana-mock.js';
 
@@ -53,6 +54,8 @@ test('Online-Datenbank: Einrichten, ins Heft schreiben, PDF', async (t) => {
     firma: 'Eiscafé Taormina', name: 'Chef', benutzername: 'chef', passwort: 'geheim123', passwort2: 'geheim123',
   });
   assert.equal(setup.status, 302);
+  await call('/einstellungen');
+  await call('/einstellungen/unterschrift', { unterschrift: signaturePng('Chef') });
   await call('/admin/mitarbeiter');
   const created = await call('/admin/mitarbeiter', { name: 'Giulia Romano', benutzername: 'giulia', passwort: 'start1234' });
   assert.equal(created.location, '/admin/mitarbeiter');

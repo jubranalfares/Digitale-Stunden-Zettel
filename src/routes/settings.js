@@ -24,7 +24,7 @@ export default function settingsRoutes({ store }) {
     }
     if (req.user.role === 'admin') {
       await store.setEmployerSignature(req.user.id, image);
-      await req.flash('success', 'Unterschrift des Arbeitgebers gespeichert. Sie erscheint jetzt automatisch auf allen Stundenzetteln und der Einsatzliste.');
+      await req.flash('success', 'Unterschrift des Arbeitgebers gespeichert. Die neue Version gilt für neue Einträge.');
     } else {
       await store.setUserSignature(req.user.id, image);
       await req.flash('success', 'Unterschrift gespeichert. Sie wird ab jetzt bei jedem Eintrag automatisch gesetzt.');
