@@ -1,3 +1,5 @@
+import crypto from 'node:crypto';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
@@ -18,6 +20,14 @@ import settingsRoutes from './routes/settings.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
+// Versionskennung für Stil und Skripte: ändert sich mit jedem Update, damit Handys nie eine alte Fassung
+// aus dem Zwischenspeicher nehmen.
+const ASSET_VERSION = (() => {
+  const hash = crypto.createHash('sha256');
+  for (const file of ['css/app.css', 'js/app.js', 'js/theme.js']) hash.update(fs.readFileSync(path.join(ROOT, 'public', file)));
+  return hash.digest('hex').slice(0, 10);
+})();
+
 // Hilfsfunktionen für die Papieransicht: Punkte (pt) werden über --pt in Bildschirmgröße umgerechnet.
 const pt = (n) => `calc(var(--pt) * ${Number(n.toFixed(3))})`;
 
@@ -34,6 +44,7 @@ export function createApp({ config, db = new LazyDatabase(config) }) {
     CODES, DATEV, ROSTER, WEEKDAYS_SHORT,
     formatDateDE, formatDuration, formatDecimalHours, monthKey, monthLabel, shiftMonth,
     pt,
+    asset: (file) => `/static/${file}?v=${ASSET_VERSION}`,
     at: (x, y) => `left:${pt(x)};top:${pt(y)}`,
     rect: ({ x, y, w, h }) => `left:${pt(x)};top:${pt(y)};width:${pt(w)};height:${pt(h)}`,
     json: (value) => JSON.stringify(value).replace(/</g, '\\u003c'),
@@ -53,6 +64,8 @@ export function createApp({ config, db = new LazyDatabase(config) }) {
 
   // Standardwerte für alle Seiten (auch Fehlerseiten, die vor der Sitzungsprüfung entstehen).
   app.use((req, res, next) => {
+    // Seiten enthalten persönliche Daten und sollen nach jedem Update sofort aktuell sein.
+    res.set('Cache-Control', 'no-store');
     req.today = todayISO(config.timeZone);
     Object.assign(res.locals, {
       today: req.today, settings: { ...DEFAULT_SETTINGS }, currentPath: req.path, title: '',

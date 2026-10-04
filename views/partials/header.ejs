@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#16302f" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0b1211" media="(prefers-color-scheme: dark)">
   <title><%= title ? `${title} · ` : '' %>Stundenzettel<%= settings.company_name ? ` · ${settings.company_name}` : '' %></title>
-  <script src="/static/js/theme.js"></script>
-  <link rel="stylesheet" href="/static/css/app.css">
+  <script src="<%= asset('js/theme.js') %>"></script>
+  <link rel="stylesheet" href="<%= asset('css/app.css') %>">
   <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
   <link rel="manifest" href="/static/manifest.webmanifest">
 </head>

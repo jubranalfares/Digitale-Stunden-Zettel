@@ -368,6 +368,19 @@ test('Der letzte Inhaber und der letzte Chef bleiben bestehen', async () => {
   assert.equal((await store.getUser(owner.id)).active, 1);
 });
 
+test('Updates kommen sofort an: Seiten nicht zwischengespeichert, Stil mit Versionskennung', async () => {
+  const page = await fetch(`${base}/login`);
+  assert.equal(page.headers.get('cache-control'), 'no-store');
+  const html = await page.text();
+  const css = /href="(\/static\/css\/app\.css\?v=[0-9a-f]{10})"/.exec(html);
+  assert.ok(css, 'Stil mit ?v=');
+  assert.match(html, /src="\/static\/js\/app\.js\?v=[0-9a-f]{10}"/);
+  assert.match(html, /src="\/static\/js\/theme\.js\?v=[0-9a-f]{10}"/);
+  const asset = await fetch(base + css[1]);
+  assert.equal(asset.status, 200);
+  assert.match(asset.headers.get('cache-control'), /max-age=\d+/);
+});
+
 test('Falsches Passwort wird abgelehnt', async () => {
   const res = await new Client().post('/login', { benutzername: 'anna', passwort: 'falsch' });
   assert.equal(res.status, 401);
