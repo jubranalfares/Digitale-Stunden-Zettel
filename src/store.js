@@ -5,7 +5,24 @@ export const DEFAULT_SETTINGS = {
   roster_title: 'Einsatzliste für Minijobber',
   logo: '',
   employer_signature_id: '',
+  demo: '',
 };
+
+const TABLES = ['settings', 'users', 'signatures', 'entries', 'month_locks', 'audit_log'];
+
+const SAVE_ENTRY_SQL = `
+  INSERT INTO entries (user_id, work_date, start_time, end_time, break_minutes, work_minutes, code, remarks,
+                       recorded_on, recorded_by, signature_id)
+  VALUES (@user_id, @work_date, @start_time, @end_time, @break_minutes, @work_minutes, @code, @remarks,
+          @recorded_on, @recorded_by, @signature_id)
+  ON CONFLICT (user_id, work_date) DO UPDATE SET
+    start_time = excluded.start_time, end_time = excluded.end_time,
+    break_minutes = excluded.break_minutes, work_minutes = excluded.work_minutes,
+    code = excluded.code, remarks = excluded.remarks,
+    recorded_on = excluded.recorded_on, recorded_by = excluded.recorded_by,
+    signature_id = excluded.signature_id, updated_at = CURRENT_TIMESTAMP`;
+
+const AUDIT_SQL = 'INSERT INTO audit_log (actor_id, user_id, work_date, action, data) VALUES (?, ?, ?, ?, ?)';
 
 export class Store {
   constructor(db) {
@@ -14,58 +31,58 @@ export class Store {
 
   // ---- Einstellungen --------------------------------------------------------
 
-  getSettings() {
-    const rows = this.db.prepare('SELECT key, value FROM settings').all();
+  async getSettings() {
     const settings = { ...DEFAULT_SETTINGS };
-    for (const { key, value } of rows) settings[key] = value ?? '';
+    for (const { key, value } of await this.db.all('SELECT key, value FROM settings')) settings[key] = value ?? '';
     return settings;
   }
 
-  setSetting(key, value) {
-    this.db.prepare(
+  async setSetting(key, value) {
+    await this.db.run(
       'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
-    ).run(key, value == null ? '' : String(value));
+      [key, value == null ? '' : String(value)],
+    );
   }
 
   // ---- Benutzer -------------------------------------------------------------
 
-  countUsers() {
-    return this.db.prepare('SELECT COUNT(*) AS n FROM users').get().n;
+  async countUsers() {
+    return Number((await this.db.get('SELECT COUNT(*) AS n FROM users')).n);
   }
 
-  createUser({ username, passwordHash, role, name, personnelNo = '', onRoster = true, mustChangePassword = false }) {
-    const info = this.db.prepare(`
+  async createUser({ username, passwordHash, role, name, personnelNo = '', onRoster = true, mustChangePassword = false }) {
+    const { lastId } = await this.db.run(`
       INSERT INTO users (username, password_hash, role, name, personnel_no, on_roster, must_change_password)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(username, passwordHash, role, name, personnelNo, onRoster ? 1 : 0, mustChangePassword ? 1 : 0);
-    return Number(info.lastInsertRowid);
+    `, [username, passwordHash, role, name, personnelNo, onRoster ? 1 : 0, mustChangePassword ? 1 : 0]);
+    return lastId;
   }
 
   getUser(id) {
-    return this.db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+    return this.db.get('SELECT * FROM users WHERE id = ?', [id]);
   }
 
   getUserByUsername(username) {
-    return this.db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+    return this.db.get('SELECT * FROM users WHERE username = ?', [username]);
   }
 
-  updateUser(id, fields) {
+  async updateUser(id, fields) {
     const allowed = ['username', 'name', 'personnel_no', 'on_roster', 'active', 'role', 'password_hash', 'must_change_password', 'signature_id'];
     const keys = Object.keys(fields).filter((k) => allowed.includes(k));
     if (!keys.length) return;
-    const sql = `UPDATE users SET ${keys.map((k) => `${k} = @${k}`).join(', ')} WHERE id = @id`;
-    this.db.prepare(sql).run({ ...fields, id });
+    const args = Object.fromEntries(keys.map((k) => [k, fields[k]]));
+    await this.db.run(`UPDATE users SET ${keys.map((k) => `${k} = @${k}`).join(', ')} WHERE id = @id`, { ...args, id });
   }
 
   listUsers() {
-    return this.db.prepare(`
+    return this.db.all(`
       SELECT * FROM users ORDER BY role = 'admin' DESC, active DESC, name COLLATE NOCASE
-    `).all();
+    `);
   }
 
   // Mitarbeiter, die für einen Monat relevant sind: aktiv (und da schon angelegt) oder mit Einträgen im Monat.
   employeesForMonth(month) {
-    return this.db.prepare(`
+    return this.db.all(`
       SELECT u.*,
              (SELECT COUNT(*) FROM entries e WHERE e.user_id = u.id AND substr(e.work_date, 1, 7) = @month) AS entry_count
       FROM users u
@@ -73,137 +90,195 @@ export class Store {
         AND ((u.active = 1 AND substr(u.created_at, 1, 7) <= @month) OR EXISTS (
           SELECT 1 FROM entries e WHERE e.user_id = u.id AND substr(e.work_date, 1, 7) = @month))
       ORDER BY u.name COLLATE NOCASE
-    `).all({ month });
+    `, { month });
   }
 
   // ---- Unterschriften -------------------------------------------------------
 
-  addSignature(kind, userId, image) {
-    const info = this.db.prepare('INSERT INTO signatures (kind, user_id, image) VALUES (?, ?, ?)').run(kind, userId, image);
-    return Number(info.lastInsertRowid);
+  async addSignature(kind, userId, image) {
+    return (await this.db.run('INSERT INTO signatures (kind, user_id, image) VALUES (?, ?, ?)', [kind, userId, image])).lastId;
   }
 
-  getSignature(id) {
+  async getSignature(id) {
     if (!id) return null;
-    return this.db.prepare('SELECT * FROM signatures WHERE id = ?').get(id) ?? null;
+    return this.db.get('SELECT * FROM signatures WHERE id = ?', [Number(id)]);
   }
 
-  setUserSignature(userId, image) {
-    const id = this.addSignature('employee', userId, image);
-    this.updateUser(userId, { signature_id: id });
+  async getSignatureImages(ids) {
+    const unique = [...new Set(ids.filter(Boolean).map(Number))];
+    if (!unique.length) return new Map();
+    const rows = await this.db.all(`SELECT id, image FROM signatures WHERE id IN (${unique.map(() => '?').join(', ')})`, unique);
+    return new Map(rows.map((r) => [r.id, r.image]));
+  }
+
+  async setUserSignature(userId, image) {
+    const id = await this.addSignature('employee', userId, image);
+    await this.updateUser(userId, { signature_id: id });
     return id;
   }
 
-  setEmployerSignature(userId, image) {
-    const id = this.addSignature('employer', userId, image);
-    this.setSetting('employer_signature_id', id);
+  async setEmployerSignature(userId, image) {
+    const id = await this.addSignature('employer', userId, image);
+    await this.setSetting('employer_signature_id', id);
     return id;
   }
 
   // Arbeitgeber-Unterschrift, die an einem Datum gültig war (sonst die älteste vorhandene).
-  employerSignatureAt(isoDate) {
-    if (!this.getSettings().employer_signature_id) return null;
-    return this.db.prepare(`
+  async employerSignatureAt(isoDate) {
+    return await this.db.get(`
       SELECT * FROM signatures WHERE kind = 'employer' AND created_at <= ? ORDER BY created_at DESC, id DESC LIMIT 1
-    `).get(`${isoDate} 23:59:59`)
-      ?? this.db.prepare(`SELECT * FROM signatures WHERE kind = 'employer' ORDER BY created_at, id LIMIT 1`).get()
-      ?? null;
+    `, [`${isoDate} 23:59:59`])
+      ?? this.db.get(`SELECT * FROM signatures WHERE kind = 'employer' ORDER BY created_at, id LIMIT 1`);
   }
 
   // ---- Einträge -------------------------------------------------------------
 
   getEntry(userId, workDate) {
-    return this.db.prepare('SELECT * FROM entries WHERE user_id = ? AND work_date = ?').get(userId, workDate);
+    return this.db.get('SELECT * FROM entries WHERE user_id = ? AND work_date = ?', [userId, workDate]);
   }
 
   listEntries(userId, month) {
-    return this.db.prepare(`
+    return this.db.all(`
       SELECT * FROM entries WHERE user_id = ? AND substr(work_date, 1, 7) = ? ORDER BY work_date
-    `).all(userId, month);
+    `, [userId, month]);
   }
 
   listMonthEntries(month) {
-    return this.db.prepare(`
-      SELECT * FROM entries WHERE substr(work_date, 1, 7) = ? ORDER BY work_date
-    `).all(month);
+    return this.db.all('SELECT * FROM entries WHERE substr(work_date, 1, 7) = ? ORDER BY work_date', [month]);
   }
 
-  saveEntry(entry) {
-    this.db.prepare(`
-      INSERT INTO entries (user_id, work_date, start_time, end_time, break_minutes, work_minutes, code, remarks,
-                           recorded_on, recorded_by, signature_id)
-      VALUES (@user_id, @work_date, @start_time, @end_time, @break_minutes, @work_minutes, @code, @remarks,
-              @recorded_on, @recorded_by, @signature_id)
-      ON CONFLICT (user_id, work_date) DO UPDATE SET
-        start_time = excluded.start_time, end_time = excluded.end_time,
-        break_minutes = excluded.break_minutes, work_minutes = excluded.work_minutes,
-        code = excluded.code, remarks = excluded.remarks,
-        recorded_on = excluded.recorded_on, recorded_by = excluded.recorded_by,
-        signature_id = excluded.signature_id, updated_at = CURRENT_TIMESTAMP
-    `).run(entry);
+  async monthTotalMinutes(userId, month) {
+    const row = await this.db.get(
+      'SELECT COALESCE(SUM(work_minutes), 0) AS m FROM entries WHERE user_id = ? AND substr(work_date, 1, 7) = ?',
+      [userId, month],
+    );
+    return Number(row.m);
   }
 
-  deleteEntry(userId, workDate) {
-    this.db.prepare('DELETE FROM entries WHERE user_id = ? AND work_date = ?').run(userId, workDate);
+  // Zuletzt gearbeitete Schichten je Mitarbeiter – für die Schnellauswahl im Erfassungsfenster.
+  async recentShifts(sinceDate, limit = 3) {
+    const rows = await this.db.all(`
+      SELECT user_id, start_time, end_time, break_minutes, MAX(work_date) AS last
+      FROM entries WHERE start_time IS NOT NULL AND work_date >= ?
+      GROUP BY user_id, start_time, end_time, break_minutes
+      ORDER BY last DESC
+    `, [sinceDate]);
+    const byUser = {};
+    for (const r of rows) {
+      byUser[r.user_id] ??= [];
+      if (byUser[r.user_id].length < limit) byUser[r.user_id].push(r);
+    }
+    return byUser;
+  }
+
+  async saveEntry(entry, audit) {
+    const statements = [[SAVE_ENTRY_SQL, entry]];
+    if (audit) statements.push([AUDIT_SQL, [audit.actorId, entry.user_id, entry.work_date, audit.action, JSON.stringify(audit.data)]]);
+    await this.db.batch(statements);
+  }
+
+  async saveEntries(entries) {
+    if (entries.length) await this.db.batch(entries.map((e) => [SAVE_ENTRY_SQL, e]));
+  }
+
+  async deleteEntry(userId, workDate, audit) {
+    await this.db.batch([
+      ['DELETE FROM entries WHERE user_id = ? AND work_date = ?', [userId, workDate]],
+      [AUDIT_SQL, [audit.actorId, userId, workDate, 'delete', JSON.stringify(audit.data)]],
+    ]);
   }
 
   // ---- Monatsabschluss ------------------------------------------------------
 
-  isLocked(month) {
-    return !!this.db.prepare('SELECT 1 FROM month_locks WHERE month = ?').get(month);
+  async isLocked(month) {
+    return !!(await this.getLock(month));
   }
 
   getLock(month) {
-    return this.db.prepare('SELECT * FROM month_locks WHERE month = ?').get(month) ?? null;
+    return this.db.get('SELECT * FROM month_locks WHERE month = ?', [month]);
   }
 
-  lockMonth(month, userId) {
-    this.db.prepare('INSERT OR IGNORE INTO month_locks (month, locked_by) VALUES (?, ?)').run(month, userId);
+  async lockMonth(month, userId) {
+    await this.db.run('INSERT OR IGNORE INTO month_locks (month, locked_by) VALUES (?, ?)', [month, userId]);
   }
 
-  unlockMonth(month) {
-    this.db.prepare('DELETE FROM month_locks WHERE month = ?').run(month);
+  async unlockMonth(month) {
+    await this.db.run('DELETE FROM month_locks WHERE month = ?', [month]);
   }
 
   // ---- Sitzungen ------------------------------------------------------------
 
-  createSession(idHash, userId, csrfToken, expiresAt) {
-    this.db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(Date.now());
-    this.db.prepare('INSERT INTO sessions (id_hash, user_id, csrf_token, expires_at) VALUES (?, ?, ?, ?)')
-      .run(idHash, userId, csrfToken, expiresAt);
+  async createSession(idHash, userId, csrfToken, expiresAt) {
+    await this.db.batch([
+      ['DELETE FROM sessions WHERE expires_at < ?', [Date.now()]],
+      ['INSERT INTO sessions (id_hash, user_id, csrf_token, expires_at) VALUES (?, ?, ?, ?)', [idHash, userId, csrfToken, expiresAt]],
+    ]);
   }
 
-  getSession(idHash) {
-    return this.db.prepare('SELECT * FROM sessions WHERE id_hash = ? AND expires_at > ?').get(idHash, Date.now());
+  // Sitzung samt Benutzer in einer Abfrage (spart online einen Datenbank-Aufruf pro Seite).
+  async getSessionWithUser(idHash) {
+    const row = await this.db.get(`
+      SELECT s.id_hash AS s_id_hash, s.csrf_token AS s_csrf_token, s.flash AS s_flash, s.expires_at AS s_expires_at, u.*
+      FROM sessions s JOIN users u ON u.id = s.user_id
+      WHERE s.id_hash = ? AND s.expires_at > ?
+    `, [idHash, Date.now()]);
+    if (!row) return null;
+    const { s_id_hash: id_hash, s_csrf_token: csrf_token, s_flash: flash, s_expires_at: expires_at, ...user } = row;
+    return { session: { id_hash, csrf_token, flash, expires_at: Number(expires_at), user_id: user.id }, user };
   }
 
-  touchSession(idHash, expiresAt) {
-    this.db.prepare('UPDATE sessions SET expires_at = ? WHERE id_hash = ?').run(expiresAt, idHash);
+  async touchSession(idHash, expiresAt) {
+    await this.db.run('UPDATE sessions SET expires_at = ? WHERE id_hash = ?', [expiresAt, idHash]);
   }
 
-  setFlash(idHash, flash) {
-    this.db.prepare('UPDATE sessions SET flash = ? WHERE id_hash = ?').run(flash ? JSON.stringify(flash) : null, idHash);
+  async setFlash(idHash, flash) {
+    await this.db.run('UPDATE sessions SET flash = ? WHERE id_hash = ?', [flash ? JSON.stringify(flash) : null, idHash]);
   }
 
-  deleteSession(idHash) {
-    this.db.prepare('DELETE FROM sessions WHERE id_hash = ?').run(idHash);
+  async deleteSession(idHash) {
+    await this.db.run('DELETE FROM sessions WHERE id_hash = ?', [idHash]);
   }
 
-  deleteUserSessions(userId, exceptIdHash = '') {
-    this.db.prepare('DELETE FROM sessions WHERE user_id = ? AND id_hash != ?').run(userId, exceptIdHash);
+  async deleteUserSessions(userId, exceptIdHash = '') {
+    await this.db.run('DELETE FROM sessions WHERE user_id = ? AND id_hash != ?', [userId, exceptIdHash]);
   }
 
   // ---- Protokoll ------------------------------------------------------------
 
-  audit(actorId, userId, workDate, action, data) {
-    this.db.prepare('INSERT INTO audit_log (actor_id, user_id, work_date, action, data) VALUES (?, ?, ?, ?, ?)')
-      .run(actorId, userId, workDate, action, data == null ? null : JSON.stringify(data));
-  }
-
   listAudit(userId, month) {
-    return this.db.prepare(`
+    return this.db.all(`
       SELECT a.*, u.name AS actor_name FROM audit_log a LEFT JOIN users u ON u.id = a.actor_id
       WHERE a.user_id = ? AND substr(a.work_date, 1, 7) = ? ORDER BY a.id DESC
-    `).all(userId, month);
+    `, [userId, month]);
+  }
+
+  // ---- Sicherung ------------------------------------------------------------
+
+  // SQL-Datei mit allen Daten; einspielbar mit `sqlite3 neu.db < datei.sql` bzw. `turso db shell … < datei.sql`.
+  async dumpSql() {
+    const quote = (v) => {
+      if (v == null) return 'NULL';
+      if (typeof v === 'number' || typeof v === 'bigint') return String(v);
+      return `'${String(v).replace(/'/g, "''")}'`;
+    };
+    const lines = ['-- Datensicherung Digitale Stundenzettel', 'BEGIN TRANSACTION;'];
+    const schema = await this.db.all(`
+      SELECT sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' AND name != 'sessions'
+      ORDER BY type = 'index', name
+    `);
+    for (const { sql } of schema) lines.push(`${sql.replace(/^CREATE (TABLE|INDEX) (?!IF NOT EXISTS)/, 'CREATE $1 IF NOT EXISTS ')};`);
+    for (const table of [...TABLES, 'schema_version']) {
+      for (const row of await this.db.all(`SELECT * FROM ${table}`)) {
+        const cols = Object.keys(row);
+        lines.push(`INSERT OR REPLACE INTO ${table} (${cols.join(', ')}) VALUES (${cols.map((c) => quote(row[c])).join(', ')});`);
+      }
+    }
+    lines.push('COMMIT;', '');
+    return lines.join('\n');
+  }
+
+  // Nur für den Demo-Modus: alles löschen und neu einrichten.
+  async wipeAll() {
+    await this.db.batch([...TABLES, 'sessions'].map((t) => [`DELETE FROM ${t}`]));
   }
 }

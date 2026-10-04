@@ -137,42 +137,54 @@
     });
   });
 
-  // ---- Erfassungsformular ---------------------------------------------------
+  // ---- Erfassungsfenster ----------------------------------------------------
 
-  const form = document.querySelector('[data-entry-form]');
+  const dialog = document.getElementById('entry-dialog');
   const dataEl = document.getElementById('entry-data');
-  if (form && dataEl) {
+  if (dialog && dataEl) {
     const data = JSON.parse(dataEl.textContent);
-    const dateInput = form.querySelector('[data-date-input]');
-    const field = (name) => form.querySelector(`[data-field="${name}"]`);
-    const modeEl = document.querySelector('[data-entry-mode]');
+    const form = dialog.querySelector('[data-entry-form]');
+    const input = (name) => form.querySelector(`[data-in="${name}"]`);
+    const out = (name) => form.querySelector(`[data-out="${name}"]`);
     const saveBtn = form.querySelector('[data-save]');
     const deleteBtn = form.querySelector('[data-delete]');
-    const blockEl = form.querySelector('[data-block-reason]');
-    const preview = form.querySelector('[data-duration-preview]');
-    const durationEl = form.querySelector('[data-duration]');
-    const labelEl = form.querySelector('[data-duration-label]');
+    const pauseChips = form.querySelector('[data-chips="pause"]');
+    const codeChips = form.querySelector('[data-chips="kuerzel"]');
+    const morePause = form.querySelector('[data-more="pause"]');
+    const WEEKDAYS = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 
-    const setPause = (value) => {
-      const select = field('pause');
-      if (![...select.options].some((o) => o.value === value)) select.add(new Option(`${value} Std.`, value));
-      select.value = value;
+    const dayTitle = (iso) => {
+      const [y, m, d] = iso.split('-').map(Number);
+      return `${WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]}, ${pad(d)}.${pad(m)}.${y}`;
     };
 
-    const blockReason = (date) => {
-      if (!date) return 'Bitte ein Datum wählen.';
-      if (date > data.today) return 'Arbeitszeiten können erst am Arbeitstag selbst oder danach eingetragen werden.';
-      if (data.locked) return 'Dieser Monat ist abgeschlossen.';
-      if (data.minDate && date < data.minDate) return 'Einträge älterer Monate kann nur der Chef ändern.';
-      return '';
+    const setPause = (value) => {
+      input('pause').value = value || '0:00';
+      let matched = false;
+      pauseChips.querySelectorAll('button').forEach((b) => {
+        const on = b.dataset.value === input('pause').value;
+        b.classList.toggle('on', on);
+        matched ||= on;
+      });
+      morePause.value = matched ? '' : input('pause').value;
+      if (!matched && morePause.value !== input('pause').value) {
+        morePause.add(new Option(`${input('pause').value} Std`, input('pause').value));
+        morePause.value = input('pause').value;
+      }
+      morePause.classList.toggle('on', !matched);
+    };
+
+    const setCode = (value) => {
+      input('kuerzel').value = value || '';
+      codeChips.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.value === input('kuerzel').value));
     };
 
     const update = () => {
-      const start = parseClock(field('beginn').value);
-      const end = parseClock(field('ende').value);
-      const pause = parseClock(field('pause').value) ?? 0;
+      const start = parseClock(input('beginn').value);
+      const end = parseClock(input('ende').value);
+      const pause = parseClock(input('pause').value) ?? 0;
       let text = '–';
-      let label = 'Dauer';
+      let label = 'Stunden an diesem Tag';
       let bad = false;
       if (start != null && end != null) {
         let gross = end - start;
@@ -183,55 +195,109 @@
           bad = true;
         } else {
           text = `${fmt(net)} Std.`;
-          if (net > 9 * 60 && pause < 45) { label = 'Pause zu kurz (mind. 45 Min.)'; bad = true; }
-          else if (net > 6 * 60 && pause < 30) { label = 'Pause zu kurz (mind. 30 Min.)'; bad = true; }
+          if (net > 9 * 60 && pause < 45) { label = 'Pause zu kurz – mind. 45 Min. (ArbZG)'; bad = true; }
+          else if (net > 6 * 60 && pause < 30) { label = 'Pause zu kurz – mind. 30 Min. (ArbZG)'; bad = true; }
         }
-      } else if (field('kuerzel').value) {
-        text = field('kuerzel').selectedOptions[0].textContent;
+      } else if (input('kuerzel').value) {
+        const chip = codeChips.querySelector('button.on');
+        text = chip ? chip.textContent.trim() : input('kuerzel').value;
       }
-      durationEl.textContent = text;
-      labelEl.textContent = label;
-      preview.classList.toggle('invalid', bad);
+      out('duration').textContent = text;
+      out('resultLabel').textContent = label;
+      out('result').classList.toggle('invalid', bad);
     };
 
-    const load = (date) => {
-      if (date && date.slice(0, 7) !== data.month) {
-        window.location.href = `${data.base}?monat=${date.slice(0, 7)}&tag=${Number(date.slice(8))}#erfassen`;
+    const blockReason = (emp, date) => {
+      if (date > data.today) return 'Dieser Tag liegt in der Zukunft.';
+      if (data.locked) return 'Dieser Monat ist abgeschlossen.';
+      if (data.minDate && date < data.minDate) return 'Einträge älterer Monate kann nur der Chef ändern.';
+      if (emp.needsSignature) return 'Bitte zuerst unter „Einstellungen“ Ihre Unterschrift hinterlegen.';
+      return '';
+    };
+
+    const open = (userId, date) => {
+      const emp = data.employees[userId];
+      if (!emp || !date) return;
+      const entry = emp.entries[date];
+      form.action = emp.save;
+      deleteBtn.formAction = emp.remove;
+      input('datum').value = date;
+      out('name').textContent = emp.name;
+      out('day').textContent = dayTitle(date);
+      input('beginn').value = entry?.beginn ?? '';
+      input('ende').value = entry?.ende ?? '';
+      input('bemerkung').value = entry?.bemerkung ?? '';
+      setPause(entry?.pause ?? '0:00');
+      setCode(entry?.kuerzel ?? '');
+      deleteBtn.classList.toggle('hidden', !entry);
+
+      const recent = out('recent');
+      recent.replaceChildren();
+      for (const r of emp.recent) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = `${r.beginn}–${r.ende}${r.pause !== '0:00' ? ` · ${r.pause} P.` : ''}`;
+        b.addEventListener('click', () => {
+          input('beginn').value = r.beginn;
+          input('ende').value = r.ende;
+          setPause(r.pause);
+          update();
+        });
+        recent.append(b);
+      }
+      out('recentWrap').classList.toggle('hidden', !emp.recent.length);
+
+      const reason = blockReason(emp, date);
+      out('block').textContent = reason;
+      out('block').classList.toggle('hidden', !reason);
+      form.querySelectorAll('.dlg-body input, .dlg-body button, .dlg-body select, .dlg-foot button')
+        .forEach((el) => { el.disabled = !!reason; });
+
+      update();
+      if (typeof dialog.showModal === 'function') dialog.showModal();
+      else dialog.setAttribute('open', '');
+    };
+
+    const close = () => (typeof dialog.close === 'function' ? dialog.close() : dialog.removeAttribute('open'));
+
+    pauseChips.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { setPause(b.dataset.value); update(); }));
+    morePause.addEventListener('change', () => { if (morePause.value) { setPause(morePause.value); update(); } });
+    codeChips.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+      setCode(input('kuerzel').value === b.dataset.value ? '' : b.dataset.value);
+      update();
+    }));
+    ['beginn', 'ende'].forEach((n) => ['input', 'change'].forEach((ev) => input(n).addEventListener(ev, update)));
+    form.querySelector('[data-dialog-close]').addEventListener('click', close);
+    dialog.addEventListener('click', (e) => { if (e.target === dialog) close(); });
+    form.addEventListener('submit', (e) => {
+      const deleting = e.submitter === deleteBtn;
+      if (!deleting && !input('beginn').value && !input('ende').value && !input('kuerzel').value) {
+        e.preventDefault();
+        out('block').textContent = 'Bitte von–bis eintragen oder ein Kürzel wählen.';
+        out('block').classList.remove('hidden');
         return;
       }
-      const entry = data.entries[date];
-      field('beginn').value = entry?.beginn ?? '';
-      field('ende').value = entry?.ende ?? '';
-      setPause(entry?.pause || '0:00');
-      field('kuerzel').value = entry?.kuerzel ?? '';
-      field('bemerkung').value = entry?.bemerkung ?? '';
-      modeEl.textContent = entry ? 'Eintrag bearbeiten' : 'Neuer Eintrag';
-      modeEl.classList.toggle('chip-warn', !!entry);
-      deleteBtn.classList.toggle('hidden', !entry);
-      document.querySelectorAll('tr[data-date]').forEach((tr) => tr.classList.toggle('is-selected', tr.dataset.date === date));
-
-      const reason = blockReason(date);
-      blockEl.textContent = reason;
-      blockEl.classList.toggle('hidden', !reason);
-      form.querySelectorAll('[data-field]').forEach((el) => { el.disabled = !!reason; });
-      saveBtn.disabled = !!reason;
-      deleteBtn.disabled = !!reason;
-      update();
-    };
-
-    dateInput.addEventListener('change', () => load(dateInput.value));
-    ['beginn', 'ende', 'pause', 'kuerzel'].forEach((name) => {
-      field(name).addEventListener('input', update);
-      field(name).addEventListener('change', update);
+      saveBtn.disabled = true;
+      deleteBtn.disabled = true;
+      // Der gedrückte Knopf ist deaktiviert – formaction deshalb selbst übernehmen.
+      if (deleting) form.action = deleteBtn.formAction;
     });
-    document.querySelectorAll('tr[data-date]').forEach((tr) => {
-      tr.addEventListener('click', () => {
-        dateInput.value = tr.dataset.date;
-        load(tr.dataset.date);
-        document.getElementById('erfassen').scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
+
+    document.addEventListener('click', (e) => {
+      const trigger = e.target.closest('[data-open-entry]');
+      if (!trigger || trigger.disabled) return;
+      e.preventDefault();
+      open(trigger.dataset.user, trigger.dataset.date);
     });
-    load(dateInput.value);
+
+    // Auf dem Handy die eigene Spalte der Einsatzliste ins Bild scrollen.
+    const own = document.querySelector('.roster-table td.name.own');
+    if (own) {
+      const scroller = own.closest('.paper-scroll');
+      if (scroller && scroller.scrollWidth > scroller.clientWidth) {
+        scroller.scrollLeft = own.offsetLeft - scroller.clientWidth / 2 + own.offsetWidth / 2 + own.closest('table').offsetLeft;
+      }
+    }
   }
 
   // ---- Logo-Upload ----------------------------------------------------------

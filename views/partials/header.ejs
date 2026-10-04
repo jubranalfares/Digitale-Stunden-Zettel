@@ -21,10 +21,11 @@
   <nav aria-label="Hauptnavigation">
     <% if (user.role === 'admin') { %>
       <a href="/admin" class="<%= navActive('/admin') || (currentPath.startsWith('/admin/zettel') ? 'active' : '') %>">Übersicht</a>
-      <a href="/admin/einsatzliste" class="<%= navActive('/admin/einsatzliste') %>">Einsatzliste</a>
+      <a href="/einsatzliste" class="<%= navActive('/einsatzliste') %>">Einsatzliste</a>
       <a href="/admin/mitarbeiter" class="<%= navActive('/admin/mitarbeiter') %>">Mitarbeiter</a>
     <% } else { %>
-      <a href="/zettel" class="<%= navActive('/zettel') %>">Mein Stundenzettel</a>
+      <a href="/zettel" class="<%= navActive('/zettel') %>">Mein Zettel</a>
+      <a href="/einsatzliste" class="<%= navActive('/einsatzliste') %>">Einsatzliste</a>
     <% } %>
     <a href="/einstellungen" class="<%= navActive('/einstellungen') %>">Einstellungen</a>
     <form method="post" action="/logout">

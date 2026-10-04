@@ -2,14 +2,16 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { csrfProtection, requireLogin, sessionMiddleware } from './auth.js';
+import { LazyDatabase } from './db.js';
 import { sendDataUrl } from './http.js';
 import { DATEV, ROSTER } from './layout.js';
-import { Store } from './store.js';
+import { DEFAULT_SETTINGS, Store } from './store.js';
 import {
   CODES, WEEKDAYS_SHORT, formatDateDE, formatDecimalHours, formatDuration, monthKey, monthLabel, shiftMonth, todayISO,
 } from './time.js';
 import adminRoutes from './routes/admin.js';
 import authRoutes from './routes/auth.js';
+import rosterRoutes from './routes/roster.js';
 import settingsRoutes from './routes/settings.js';
 import timesheetRoutes from './routes/timesheet.js';
 
@@ -18,7 +20,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // Hilfsfunktionen für die Papieransicht: Punkte (pt) werden über --pt in Bildschirmgröße umgerechnet.
 const pt = (n) => `calc(var(--pt) * ${Number(n.toFixed(3))})`;
 
-export function createApp({ db, config }) {
+export function createApp({ config, db = new LazyDatabase(config) }) {
   const store = new Store(db);
   const app = express();
 
@@ -46,13 +48,26 @@ export function createApp({ db, config }) {
   });
   app.use('/static', express.static(path.join(ROOT, 'public'), { maxAge: '1d' }));
   app.use('/fonts', express.static(path.join(ROOT, 'assets', 'fonts'), { maxAge: '30d' }));
+  app.get('/healthz', (req, res) => res.type('text').send('ok'));
+
   // Standardwerte für alle Seiten (auch Fehlerseiten, die vor der Sitzungsprüfung entstehen).
   app.use((req, res, next) => {
     req.today = todayISO(config.timeZone);
     Object.assign(res.locals, {
-      today: req.today, settings: store.getSettings(), currentPath: req.path, title: '',
+      today: req.today, settings: { ...DEFAULT_SETTINGS }, currentPath: req.path, title: '',
       user: null, flash: null, csrfToken: '',
     });
+    next();
+  });
+
+  // Auf Vercel ohne verbundene Datenbank: Anleitung statt Fehlermeldung.
+  if (config.dbMissing) {
+    app.use((req, res) => res.status(503).render('db-missing', { title: 'Datenbank verbinden' }));
+    return app;
+  }
+
+  app.use(async (req, res, next) => {
+    res.locals.settings = await store.getSettings();
     next();
   });
   app.use(express.urlencoded({ extended: false, limit: '4mb' }));
@@ -63,20 +78,19 @@ export function createApp({ db, config }) {
   app.use(authRoutes(ctx));
   app.use(settingsRoutes(ctx));
   app.use(timesheetRoutes(ctx));
+  app.use(rosterRoutes(ctx));
   app.use('/admin', adminRoutes(ctx));
 
-  app.get('/healthz', (req, res) => res.type('text').send('ok'));
-
   // Unterschriften als Bild: eigene, die des Arbeitgebers – der Chef darf alle sehen.
-  app.get('/signatur/:id.png', requireLogin, (req, res) => {
-    const signature = store.getSignature(Number(req.params.id));
+  app.get('/signatur/:id.png', requireLogin, async (req, res) => {
+    const signature = await store.getSignature(Number(req.params.id));
     const allowed = signature && (req.user.role === 'admin' || signature.kind === 'employer' || signature.user_id === req.user.id);
     if (!allowed) return res.status(404).end();
     sendDataUrl(res, signature.image, 'private, max-age=31536000, immutable');
   });
 
   app.get('/logo', requireLogin, (req, res) => {
-    const { logo } = store.getSettings();
+    const { logo } = res.locals.settings;
     if (!logo) return res.status(404).end();
     sendDataUrl(res, logo, 'private, no-cache');
   });

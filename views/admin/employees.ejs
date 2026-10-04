@@ -10,7 +10,7 @@
   <div class="table-wrap">
     <table class="data-table">
       <thead>
-        <tr><th>Name</th><th>Benutzername</th><th class="hide-mobile">Pers.-Nr.</th><th class="hide-mobile">Einsatzliste</th><th>Unterschrift</th><th class="actions"></th></tr>
+        <tr><th>Name</th><th>Benutzername</th><th class="hide-mobile">Einsatzliste</th><th>Unterschrift</th><th class="actions"></th></tr>
       </thead>
       <tbody>
         <% users.forEach((u) => { %>
@@ -22,7 +22,6 @@
               <% if (u.must_change_password) { %> <span class="chip chip-warn">noch nicht angemeldet</span><% } %>
             </td>
             <td><%= u.username %></td>
-            <td class="hide-mobile"><%= u.personnel_no || '–' %></td>
             <td class="hide-mobile"><%= u.role === 'employee' ? (u.on_roster ? 'ja' : 'nein') : '–' %></td>
             <td><% if (u.role === 'admin') { %>–<% } else if (u.signature_id) { %><span class="chip chip-ok">✓</span><% } else { %><span class="chip chip-danger">fehlt</span><% } %></td>
             <td class="actions"><a class="btn btn-small" href="/admin/mitarbeiter/<%= u.id %>">Bearbeiten</a></td>
@@ -43,7 +42,7 @@
     <label>Benutzername <span class="hint">(zum Anmelden)</span>
       <input name="benutzername" value="<%= values.username || '' %>" autocapitalize="none" autocomplete="off" required pattern="[A-Za-z0-9._@\-]{3,40}">
     </label>
-    <label>Personalnummer <span class="hint">(optional)</span> <input name="persnr" value="<%= values.personnel_no || '' %>"></label>
+    <label>Personalnummer <span class="hint">(optional, erscheint nur auf dem Stundenzettel)</span> <input name="persnr" value="<%= values.personnel_no || '' %>"></label>
     <label>Startpasswort <input name="passwort" value="<%= suggestedPassword %>" minlength="8" required autocomplete="off"></label>
     <label>Rolle
       <select name="rolle">

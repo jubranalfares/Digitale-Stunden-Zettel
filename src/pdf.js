@@ -229,7 +229,6 @@ function drawRosterPage(doc, roster, columns, pageIndex) {
     const x = R.colX[i];
     const w = R.colW;
     drawName(doc, emp.name, x, T.top, w, T.nameRowH);
-    cellText(doc, emp.personnelNo, x, T.top + T.nameRowH, w, T.secondRowH, { font: R.font, size: 8, color: '#333' });
     for (let d = 1; d <= 31; d++) {
       const cell = emp.days[d];
       if (cell) drawRosterCell(doc, cell, x, T.daysTop + (d - 1) * T.rowH, w, T.rowH);

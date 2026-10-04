@@ -9,7 +9,6 @@
   const K = L.key;
   const codes = Object.entries(CODES);
   const fields = [['firma', sheet.company], ['name', sheet.employee.name], ['persNr', sheet.employee.personnelNo], ['month', sheet.monthLabel]];
-  const selected = locals.selectedDate || '';
 %>
 <div class="paper-wrap">
   <div class="paper datev" role="img" aria-label="Stundenzettel <%= sheet.employee.name %>, <%= sheet.monthLabel %>">
@@ -30,9 +29,9 @@
       <tbody style="font-size:<%= pt(T.bodySize) %>">
         <tr style="height:<%= pt(T.rowH) %>"><% T.cols.forEach(() => { %><td></td><% }) %></tr>
         <% sheet.rows.forEach((r) => { %>
-          <tr style="height:<%= pt(T.rowH) %>"
-              class="<%= r.exists ? '' : 'missing' %> <%= r.date && r.date === selected ? 'is-selected' : '' %>"
-              <% if (locals.interactive && r.exists) { %>data-date="<%= r.date %>"<% } %>>
+          <% const clickable = locals.interactive && r.exists && r.date <= locals.today; %>
+          <tr style="height:<%= pt(T.rowH) %>" class="<%= r.exists ? '' : 'missing' %> <%= clickable ? 'editable' : '' %>"
+              <% if (clickable) { %>data-open-entry data-user="<%= editUser %>" data-date="<%= r.date %>"<% } %>>
             <td><%= r.day %></td>
             <td><%= r.start || '' %></td>
             <td><%= r.breakTime || '' %></td>

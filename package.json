@@ -15,8 +15,8 @@
     "demo": "node scripts/demo-data.js"
   },
   "dependencies": {
+    "@libsql/client": "^0.18.0",
     "archiver": "^8.0.0",
-    "better-sqlite3": "^13.0.3",
     "ejs": "^6.0.1",
     "express": "^5.2.1",
     "pdfkit": "^0.20.2"

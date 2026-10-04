@@ -31,7 +31,7 @@
   <div class="btn-row">
     <a class="btn btn-primary <%= exportable ? '' : 'disabled' %>" href="/admin/export.zip?monat=<%= month %>">ZIP (eine PDF je Mitarbeiter)</a>
     <a class="btn <%= exportable ? '' : 'disabled' %>" href="/admin/export.pdf?monat=<%= month %>">Alles in einer PDF</a>
-    <a class="btn" href="/admin/einsatzliste?monat=<%= month %>">Einsatzliste ansehen</a>
+    <a class="btn" href="/einsatzliste?monat=<%= month %>">Einsatzliste ansehen</a>
   </div>
 </div>
 
@@ -56,7 +56,6 @@
         <thead>
           <tr>
             <th>Mitarbeiter</th>
-            <th class="hide-mobile">Pers.-Nr.</th>
             <th class="num">Tage</th>
             <th class="num">Stunden</th>
             <th class="hide-mobile">Zuletzt erfasst</th>
@@ -68,7 +67,6 @@
           <% rows.forEach((r) => { %>
             <tr class="<%= r.user.active ? '' : 'inactive' %>">
               <td><a href="/admin/zettel/<%= r.user.id %>?monat=<%= month %>"><strong><%= r.user.name %></strong></a><% if (!r.user.active) { %> <span class="chip">inaktiv</span><% } %></td>
-              <td class="hide-mobile"><%= r.user.personnel_no || '–' %></td>
               <td class="num"><%= r.days %></td>
               <td class="num"><%= r.minutes ? formatDuration(r.minutes) : '–' %></td>
               <td class="hide-mobile"><%= r.lastRecorded ? formatDateDE(r.lastRecorded) : '–' %></td>
@@ -86,7 +84,7 @@
           <% }) %>
         </tbody>
         <tfoot>
-          <tr><td>Summe</td><td class="hide-mobile"></td><td class="num"><%= rows.reduce((s, r) => s + r.days, 0) %></td><td class="num"><%= formatDuration(totalMinutes) %></td><td class="hide-mobile"></td><td></td><td></td></tr>
+          <tr><td>Summe</td><td class="num"><%= rows.reduce((s, r) => s + r.days, 0) %></td><td class="num"><%= formatDuration(totalMinutes) %></td><td class="hide-mobile"></td><td></td><td></td></tr>
         </tfoot>
       </table>
     </div>

@@ -1,23 +1,20 @@
 <%- include('partials/header') %>
 <%
   const isAdmin = user.role === 'admin';
-  const pauseOptions = [['0:00', 'keine'], ['0:15', '15 Min.'], ['0:20', '20 Min.'], ['0:30', '30 Min.'], ['0:45', '45 Min.'],
-    ['1:00', '1 Std.'], ['1:15', '1:15 Std.'], ['1:30', '1:30 Std.'], ['1:45', '1:45 Std.'], ['2:00', '2 Std.'],
-    ['2:30', '2:30 Std.'], ['3:00', '3 Std.'], ['3:30', '3:30 Std.'], ['4:00', '4 Std.']];
   const listed = sheet.rows.filter((r) => r.entry);
+  const canEnter = !isAdmin ? !!signature : true;
 %>
 <div class="page-head">
   <div>
     <h1><%= isAdmin ? employee.name : 'Mein Stundenzettel' %></h1>
     <div class="sub">
       <% if (isAdmin) { %><a href="/admin?monat=<%= sheet.month %>">← Übersicht</a> · <% } %>
-      Pers.-Nr. <%= employee.personnel_no || '–' %> ·
-      Summe <strong><%= sheet.total %> Std.</strong> <span class="muted">(<%= sheet.totalDecimal %>)</span>
+      Monatssumme <strong><%= sheet.total %> Std.</strong> <span class="muted">(<%= sheet.totalDecimal %>)</span>
     </div>
   </div>
   <div class="spacer"></div>
   <%- include('partials/month-nav', { navBase: base, ym, isCurrentMonth }) %>
-  <a class="btn" href="<%= base %>/pdf?monat=<%= sheet.month %>" target="_blank" rel="noopener">PDF öffnen</a>
+  <a class="btn" href="<%= base %>/pdf?monat=<%= sheet.month %>" target="_blank" rel="noopener">PDF</a>
 </div>
 
 <% if (sheet.locked) { %>
@@ -36,93 +33,56 @@
   </div>
 <% } %>
 
-<div class="sheet-layout">
-  <section class="card entry-card" id="erfassen">
-    <h2>Zeit erfassen <span class="chip entry-mode" data-entry-mode>Neuer Eintrag</span></h2>
-    <form method="post" action="<%= base %>/eintrag" class="stack" data-entry-form>
-      <input type="hidden" name="_csrf" value="<%= csrfToken %>">
-      <label>Datum
-        <input type="date" name="datum" value="<%= selectedDate %>" max="<%= today %>" <%- minDate ? `min="${minDate}"` : '' %> required data-date-input>
-      </label>
-      <div class="time-grid">
-        <label>Beginn <input type="time" name="beginn" data-field="beginn"></label>
-        <label>Ende <input type="time" name="ende" data-field="ende"></label>
-      </div>
-      <div class="time-grid">
-        <label>Pause
-          <select name="pause" data-field="pause">
-            <% pauseOptions.forEach(([value, label]) => { %><option value="<%= value %>"><%= label %></option><% }) %>
-          </select>
-        </label>
-        <label>Kürzel *
-          <select name="kuerzel" data-field="kuerzel">
-            <option value="">–</option>
-            <% Object.entries(CODES).forEach(([code, text]) => { %><option value="<%= code %>"><%= code %> – <%= text %></option><% }) %>
-          </select>
-        </label>
-      </div>
-      <label>Bemerkung <input name="bemerkung" maxlength="200" placeholder="optional" data-field="bemerkung"></label>
-      <div class="duration-preview" data-duration-preview><span data-duration-label>Dauer</span><strong data-duration>–</strong></div>
-      <div class="flash flash-info small hidden" data-block-reason></div>
-      <div class="form-actions">
-        <button class="btn btn-primary" type="submit" data-save>Speichern</button>
-        <button class="btn btn-danger hidden" type="submit" formaction="<%= base %>/loeschen" formnovalidate data-delete data-confirm="Eintrag für diesen Tag wirklich löschen?">Löschen</button>
-      </div>
-    </form>
-    <div class="sig-note">
-      <% if (isAdmin) { %>
-        <span>Vom Chef erfasste oder geänderte Einträge werden mit „AG“ gekennzeichnet. Die Unterschrift des Mitarbeiters wird dabei nicht gesetzt.</span>
-      <% } else if (signature) { %>
-        <img src="/signatur/<%= signature.id %>.png" alt="Ihre Unterschrift">
-        <span>Ihre Unterschrift wird beim Speichern automatisch auf Stundenzettel und Einsatzliste gesetzt.</span>
-      <% } %>
-    </div>
-  </section>
+<div class="quick-bar">
+  <button type="button" class="btn btn-primary btn-big" data-open-entry data-user="<%= employee.id %>" data-date="<%= quickDate %>" <%= sheet.locked || !canEnter ? 'disabled' : '' %>>
+    ＋ <%= isCurrentMonth ? 'Heute erfassen' : `${formatDateDE(quickDate).slice(0, 6)} erfassen` %>
+  </button>
+  <span class="muted small">oder einen Tag im Formular antippen<% if (!isAdmin && signature) { %> · Ihre Unterschrift wird automatisch gesetzt<% } %></span>
+</div>
 
-  <section class="paper-section">
-    <div class="card mobile-only" style="margin-bottom:16px">
-      <h2>Einträge im <%= sheet.monthLabel %></h2>
-      <% if (!listed.length) { %>
-        <p class="muted small">Noch keine Einträge in diesem Monat.</p>
-      <% } else { %>
-        <table class="entry-list">
-          <thead><tr><th>Tag</th><th>Zeit</th><th>Pause</th><th class="right">Dauer</th></tr></thead>
+<div class="card mobile-only" style="margin-bottom:16px">
+  <h2>Einträge im <%= sheet.monthLabel %></h2>
+  <% if (!listed.length) { %>
+    <p class="muted small" style="margin:0">Noch keine Einträge in diesem Monat.</p>
+  <% } else { %>
+    <table class="entry-list">
+      <thead><tr><th>Tag</th><th>von–bis</th><th>Pause</th><th class="right">Std.</th></tr></thead>
+      <tbody>
+        <% listed.forEach((r) => { %>
+          <tr data-open-entry data-user="<%= employee.id %>" data-date="<%= r.date %>">
+            <td class="nowrap"><%= WEEKDAYS_SHORT[r.weekday] %> <%= String(r.day).padStart(2, '0') %>.</td>
+            <td class="num"><%= r.start ? `${r.start}–${r.end}` : '' %> <% if (r.code) { %><span class="chip"><%= r.code %></span><% } %></td>
+            <td class="num"><%= r.breakTime %></td>
+            <td class="num right"><strong><%= r.duration %></strong></td>
+          </tr>
+        <% }) %>
+      </tbody>
+      <tfoot><tr><td colspan="3">Monatssumme</td><td class="num right"><%= sheet.total %></td></tr></tfoot>
+    </table>
+  <% } %>
+</div>
+
+<div class="paper-scroll">
+  <%- include('partials/datev-paper', { sheet, interactive: true, editUser: employee.id, today }) %>
+</div>
+
+<% if (isAdmin && auditRows.length) { %>
+  <div class="card" style="margin-top:20px">
+    <details class="audit">
+      <summary>Änderungsprotokoll (<%= auditRows.length %>)</summary>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Zeitpunkt</th><th>Tag</th><th>Aktion</th><th>Durch</th><th>Details</th></tr></thead>
           <tbody>
-            <% listed.forEach((r) => { %>
-              <tr data-date="<%= r.date %>" class="<%= r.date === selectedDate ? 'is-selected' : '' %>">
-                <td class="nowrap"><%= WEEKDAYS_SHORT[r.weekday] %> <%= String(r.day).padStart(2, '0') %>.</td>
-                <td class="num"><%= r.start ? `${r.start}–${r.end}` : '' %> <% if (r.code) { %><span class="chip"><%= r.code %></span><% } %></td>
-                <td class="num"><%= r.breakTime %></td>
-                <td class="num right"><%= r.duration %></td>
-              </tr>
+            <% auditRows.forEach((a) => { %>
+              <tr><td class="nowrap"><%= a.when %></td><td class="nowrap"><%= a.day %></td><td><%= a.action %></td><td><%= a.actor %></td><td><%= a.details %></td></tr>
             <% }) %>
           </tbody>
         </table>
-      <% } %>
-    </div>
-
-    <h2 class="hide-mobile">Formularansicht <span class="paper-hint">Zeile anklicken, um den Tag zu bearbeiten</span></h2>
-    <%- include('partials/datev-paper', { sheet, interactive: true, selectedDate }) %>
-
-    <% if (isAdmin && auditRows.length) { %>
-      <div class="card" style="margin-top:20px">
-        <details class="audit">
-          <summary>Änderungsprotokoll (<%= auditRows.length %>)</summary>
-          <div class="table-wrap">
-            <table class="data-table">
-              <thead><tr><th>Zeitpunkt</th><th>Tag</th><th>Aktion</th><th>Durch</th><th>Details</th></tr></thead>
-              <tbody>
-                <% auditRows.forEach((a) => { %>
-                  <tr><td class="nowrap"><%= a.when %></td><td class="nowrap"><%= a.day %></td><td><%= a.action %></td><td><%= a.actor %></td><td><%= a.details %></td></tr>
-                <% }) %>
-              </tbody>
-            </table>
-          </div>
-        </details>
       </div>
-    <% } %>
-  </section>
-</div>
+    </details>
+  </div>
+<% } %>
 
-<script type="application/json" id="entry-data"><%- json({ entries: entriesByDate, month: sheet.month, base, today, minDate, locked: sheet.locked, isAdmin }) %></script>
+<%- include('partials/entry-dialog', { dialog, returnTo }) %>
 <%- include('partials/footer') %>

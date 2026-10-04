@@ -1,0 +1,32 @@
+<%- include('partials/header') %>
+<% const ownColumn = !isAdmin && roster.employees.some((e) => e.id === user.id); %>
+<div class="page-head">
+  <div>
+    <h1><%= roster.title %></h1>
+    <div class="sub">
+      <% if (isAdmin) { %>Tag antippen, um für einen Mitarbeiter Zeiten einzutragen.
+      <% } else if (ownColumn) { %>Tippen Sie in <strong>Ihrer Spalte</strong> auf einen Tag, um von–bis einzutragen.
+      <% } else { %>Sie stehen nicht auf der Einsatzliste – bitte über „Mein Stundenzettel“ erfassen.<% } %>
+    </div>
+  </div>
+  <div class="spacer"></div>
+  <%- include('partials/month-nav', { navBase: '/einsatzliste', ym, isCurrentMonth }) %>
+  <% if (isAdmin) { %><a class="btn btn-primary" href="/admin/einsatzliste/pdf?monat=<%= roster.month %>" target="_blank" rel="noopener">PDF</a><% } %>
+</div>
+<% if (roster.locked) { %>
+  <div class="flash flash-info">🔒 <%= roster.monthLabel %> ist abgeschlossen.</div>
+<% } %>
+<% if (!roster.employees.length) { %>
+  <div class="flash flash-info">Für diesen Monat stehen noch keine Mitarbeiter auf der Einsatzliste.</div>
+<% } %>
+<% roster.pages.forEach((columns, pageIndex) => { %>
+  <div class="paper-scroll roster-scroll">
+    <%- include('partials/roster-paper', {
+      roster, columns, pageIndex, viewer: user, today,
+      linkBase: isAdmin ? '/admin/zettel' : '',
+      editableIds: Object.keys(dialog.employees),
+    }) %>
+  </div>
+<% }) %>
+<%- include('partials/entry-dialog', { dialog, returnTo }) %>
+<%- include('partials/footer') %>

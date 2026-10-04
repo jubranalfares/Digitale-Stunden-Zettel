@@ -56,6 +56,16 @@
   <p class="muted small">Alle Stundenzettel, Unterschriften und Mitarbeiter in einer Datei. Am besten monatlich nach dem Export herunterladen und sicher aufbewahren (Arbeitszeitnachweise mindestens 2 Jahre aufbewahren).</p>
   <a class="btn" href="/admin/sicherung">Sicherung herunterladen</a>
 </div>
+<% if (settings.demo) { %>
+<div class="card" id="demo">
+  <h2>Demo beenden</h2>
+  <p class="muted small">Gerade laufen Beispieldaten. Wenn Sie fertig getestet haben: alles löschen und den Betrieb richtig einrichten.</p>
+  <form method="post" action="/admin/demo-beenden">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <button class="btn btn-danger" type="submit" data-confirm="Alle Beispieldaten löschen und neu einrichten?">Beispieldaten löschen &amp; neu einrichten</button>
+  </form>
+</div>
+<% } %>
 <% } %>
 
 <div class="card" id="passwort">

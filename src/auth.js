@@ -59,35 +59,31 @@ function cookieOptions(req, config) {
   };
 }
 
-export function startSession(req, res, store, config, userId) {
+export async function startSession(req, res, store, config, userId) {
   const token = crypto.randomBytes(32).toString('base64url');
   const expiresAt = Date.now() + SESSION_DAYS * DAY_MS;
-  store.createSession(sha256(token), userId, crypto.randomBytes(24).toString('base64url'), expiresAt);
+  await store.createSession(sha256(token), userId, crypto.randomBytes(24).toString('base64url'), expiresAt);
   res.cookie(SESSION_COOKIE, token, { ...cookieOptions(req, config), maxAge: SESSION_DAYS * DAY_MS });
 }
 
-export function endSession(req, res, store, config) {
-  if (req.session) store.deleteSession(req.session.id_hash);
+export async function endSession(req, res, store, config) {
+  if (req.session) await store.deleteSession(req.session.id_hash);
   res.clearCookie(SESSION_COOKIE, cookieOptions(req, config));
 }
 
 export function sessionMiddleware(store, config) {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     req.user = null;
     req.session = null;
     const token = parseCookies(req.headers.cookie)[SESSION_COOKIE];
-    if (token) {
-      const session = store.getSession(sha256(token));
-      const user = session && store.getUser(session.user_id);
-      if (session && user?.active) {
-        req.session = session;
-        req.user = user;
-        // Gleitende Verlängerung, damit Mitarbeiter auf dem Handy angemeldet bleiben.
-        if (session.expires_at - Date.now() < (SESSION_DAYS - 1) * DAY_MS) {
-          const expiresAt = Date.now() + SESSION_DAYS * DAY_MS;
-          store.touchSession(session.id_hash, expiresAt);
-          res.cookie(SESSION_COOKIE, token, { ...cookieOptions(req, config), maxAge: SESSION_DAYS * DAY_MS });
-        }
+    const found = token ? await store.getSessionWithUser(sha256(token)) : null;
+    if (found?.user.active) {
+      req.session = found.session;
+      req.user = found.user;
+      // Gleitende Verlängerung, damit Mitarbeiter auf dem Handy angemeldet bleiben.
+      if (found.session.expires_at - Date.now() < (SESSION_DAYS - 1) * DAY_MS) {
+        await store.touchSession(found.session.id_hash, Date.now() + SESSION_DAYS * DAY_MS);
+        res.cookie(SESSION_COOKIE, token, { ...cookieOptions(req, config), maxAge: SESSION_DAYS * DAY_MS });
       }
     }
 
@@ -95,10 +91,10 @@ export function sessionMiddleware(store, config) {
     res.locals.flash = null;
     if (req.session?.flash) {
       res.locals.flash = JSON.parse(req.session.flash);
-      store.setFlash(req.session.id_hash, null);
+      await store.setFlash(req.session.id_hash, null);
     }
-    req.flash = (type, message, details = []) => {
-      if (req.session) store.setFlash(req.session.id_hash, { type, message, details });
+    req.flash = async (type, message, details = []) => {
+      if (req.session) await store.setFlash(req.session.id_hash, { type, message, details });
     };
 
     res.locals.user = req.user;

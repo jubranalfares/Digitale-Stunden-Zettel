@@ -26,10 +26,10 @@ function rowFromEntry(entry, employeeId) {
 }
 
 // Stundenzettel eines Mitarbeiters ("Vorlage zur Dokumentation der täglichen Arbeitszeit").
-export function buildEmployeeSheet(store, employee, ym) {
+export async function buildEmployeeSheet(store, employee, ym) {
   const month = monthKey(ym);
-  const settings = store.getSettings();
-  const entries = store.listEntries(employee.id, month);
+  const settings = await store.getSettings();
+  const entries = await store.listEntries(employee.id, month);
   const byDate = new Map(entries.map((e) => [e.work_date, e]));
 
   const rows = [];
@@ -52,13 +52,13 @@ export function buildEmployeeSheet(store, employee, ym) {
   const signed = entries.filter((e) => e.signature_id && e.recorded_by === employee.id);
   const lastSigned = signed.reduce((a, e) => (!a || e.recorded_on >= a.recorded_on ? e : a), null);
   const employeeSignature = lastSigned
-    ? signatureBlock(store.getSignature(lastSigned.signature_id), lastSigned.recorded_on)
+    ? signatureBlock(await store.getSignature(lastSigned.signature_id), lastSigned.recorded_on)
     : null;
 
   // Arbeitgeber-Unterschrift: datiert auf den letzten Eintrag des Monats (inkl. Korrekturen durch den Chef).
   const lastRecorded = maxDate(entries.map((e) => e.recorded_on));
   const employerSignature = lastRecorded
-    ? signatureBlock(store.employerSignatureAt(lastRecorded), lastRecorded)
+    ? signatureBlock(await store.employerSignatureAt(lastRecorded), lastRecorded)
     : null;
 
   return {
@@ -75,25 +75,23 @@ export function buildEmployeeSheet(store, employee, ym) {
     totalDecimal: formatDecimalHours(totalMinutes),
     employeeSignature,
     employerSignature,
-    locked: store.isLocked(month),
+    locked: await store.isLocked(month),
   };
 }
 
 // Großes Blatt mit allen Mitarbeitern ("Einsatzliste"). 8 Mitarbeiter pro Seite wie auf dem Papierformular.
 export const ROSTER_COLUMNS = 8;
 
-export function buildRoster(store, ym) {
+export async function buildRoster(store, ym) {
   const month = monthKey(ym);
-  const settings = store.getSettings();
-  const entries = store.listMonthEntries(month);
-  const signatureCache = new Map();
-  const signatureImage = (id) => {
-    if (!id) return null;
-    if (!signatureCache.has(id)) signatureCache.set(id, store.getSignature(id)?.image ?? null);
-    return signatureCache.get(id);
-  };
+  const settings = await store.getSettings();
+  const entries = await store.listMonthEntries(month);
 
-  const employees = store.employeesForMonth(month)
+  // Alle benötigten Unterschriften vorab laden
+  const images = await store.getSignatureImages(entries.map((e) => e.signature_id));
+  const signatureImage = (id) => images.get(id) ?? null;
+
+  const employees = (await store.employeesForMonth(month))
     .filter((u) => u.on_roster)
     .map((u) => {
       const own = entries.filter((e) => e.user_id === u.id);
@@ -114,6 +112,7 @@ export function buildRoster(store, ym) {
         id: u.id,
         name: u.name,
         personnelNo: u.personnel_no,
+        signature_id: u.signature_id,
         days,
         totalMinutes,
         total: own.length ? formatDuration(totalMinutes) : '',
@@ -139,7 +138,7 @@ export function buildRoster(store, ym) {
     daysInMonth: daysInMonth(ym.year, ym.month),
     employees,
     pages,
-    employerSignature: lastRecorded ? signatureBlock(store.employerSignatureAt(lastRecorded), lastRecorded) : null,
-    locked: store.isLocked(month),
+    employerSignature: lastRecorded ? signatureBlock(await store.employerSignatureAt(lastRecorded), lastRecorded) : null,
+    locked: await store.isLocked(month),
   };
 }

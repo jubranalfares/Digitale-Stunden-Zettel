@@ -1,0 +1,20 @@
+<%- include('partials/header', { bare: true }) %>
+<div class="auth-wrap">
+  <div class="card auth-card wide">
+    <div class="auth-brand">
+      <span class="brand-mark" aria-hidden="true">⏱</span>
+      <div><strong>Digitale Stundenzettel</strong><span>Fast geschafft</span></div>
+    </div>
+    <h1>Noch eine Datenbank verbinden</h1>
+    <p>Die App läuft – sie braucht nur noch einen Ort, an dem die Stundenzettel dauerhaft gespeichert werden.
+      Vercel selbst speichert keine Dateien.</p>
+    <ol class="steps">
+      <li>Im Vercel-Projekt oben auf <strong>Storage</strong> tippen.</li>
+      <li><strong>Create Database</strong> → <strong>Turso</strong> wählen (kostenlos) und mit diesem Projekt verbinden.</li>
+      <li>Unter <strong>Deployments</strong> beim obersten Eintrag <strong>⋯ → Redeploy</strong> tippen.</li>
+    </ol>
+    <p class="muted small">Die Zugangsdaten (<code>TURSO_DATABASE_URL</code>, <code>TURSO_AUTH_TOKEN</code>) trägt Vercel dabei automatisch ein.
+      Alternativ eine Datenbank auf turso.tech anlegen und beide Werte unter Settings → Environment Variables eintragen.</p>
+  </div>
+</div>
+<%- include('partials/footer') %>
