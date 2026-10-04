@@ -1,6 +1,6 @@
 <%#
   Nachbildung der Einsatzliste (alle Mitarbeiter, 8 pro Blatt). Maße: src/layout.js (ROSTER).
-  Mit canEditColumn/editable wird die Liste direkt beschreibbar ("12-16" in die Zelle tippen).
+  Mit canEditColumn/editable lassen sich Tage antippen und im Eingabefenster erfassen.
 %>
 <%
   const R = ROSTER;
@@ -46,7 +46,10 @@
                const date = `${roster.month}-${pad2(d)}`;
                const canType = own(emp) && d <= roster.daysInMonth && editable(date);
           %>
-            <td class="<%= d > roster.daysInMonth ? 'missing' : '' %> <%= ownClass(emp) %> <%= canType ? 'editable' : '' %>">
+            <td class="<%= d > roster.daysInMonth ? 'missing' : '' %> <%= ownClass(emp) %> <%= canType ? 'editable' : '' %>"
+              <% if (canType) { %>data-entry data-user="<%= emp.id %>" data-name="<%= emp.name %>" data-date="<%= date %>"
+                data-start="<%= c ? c.start : '' %>" data-end="<%= c ? c.end : '' %>" data-pause="<%= c ? c.breakMinutes : 0 %>"
+                data-code="<%= c ? c.code : '' %>" data-remarks="<%= c ? c.remarks : '' %>"<% } %>>
               <div class="rc" data-cell-view>
                 <% if (c) { %>
                   <div class="rc-text" style="font-size:<%= pt(c.duration ? 8.5 : 9) %>">
@@ -59,8 +62,7 @@
                 <% } %>
               </div>
               <% if (canType) { %>
-                <input class="rc-in" data-cell data-user="<%= emp.id %>" data-date="<%= date %>" value="<%= c ? c.raw : '' %>"
-                       autocomplete="off" autocapitalize="characters" enterkeyhint="next" aria-label="<%= emp.name %>, <%= d %>.">
+                <button type="button" class="rc-btn" data-edit aria-label="<%= emp.name %>, <%= d %>. eintragen"></button>
               <% } %>
             </td>
           <% }) %>

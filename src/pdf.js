@@ -275,7 +275,7 @@ function drawName(doc, name, x, y, w, h) {
 }
 
 function drawRosterCell(doc, cell, x, y, w, h) {
-  const textW = 22;
+  const textW = 27;
   if (cell.duration) {
     cellText(doc, cell.duration, x + 0.5, cell.code ? y - 3.6 : y, textW, h, { font: ROSTER.font, size: 8.5, align: 'left' });
     if (cell.code) cellText(doc, cell.code, x + 0.5, y + 4.2, textW, h, { font: ROSTER.fontBold, size: 6.5, align: 'left' });

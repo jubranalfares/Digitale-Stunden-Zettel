@@ -1,40 +1,45 @@
 // Baut die Daten für die beiden Formulare auf, die sowohl im Browser als auch im PDF dargestellt werden.
 import {
-  daysInMonth, formatClock, formatDateDE, formatDecimalHours, formatDuration, isoDate, monthKey, monthLabel, weekday,
+  daysInMonth, formatClock, formatDateDE, formatHours, formatPause, isoDate, monthEndISO, monthKey, monthLabel, weekday,
 } from './time.js';
 
-const maxDate = (dates) => dates.filter(Boolean).sort().at(-1) ?? null;
-
+// Unterschriften tragen immer das Datum des letzten Monatstags.
 function signatureBlock(signature, date) {
   if (!signature || !date) return null;
   return { id: signature.id, image: signature.image, date, dateLabel: formatDateDE(date) };
 }
+
+// Rohwerte eines Tages für das Eingabefenster.
+const entryData = (entry) => ({
+  start: formatClock(entry.start_time),
+  end: formatClock(entry.end_time),
+  breakMinutes: entry.start_time != null ? entry.break_minutes || 0 : 0,
+  code: entry.code ?? '',
+  remarks: entry.remarks ?? '',
+});
 
 // Eine Zeile des Stundenzettels.
 export function rowFromEntry(entry, employeeId) {
   const timed = entry.start_time != null;
   return {
     entry,
-    start: formatClock(entry.start_time),
-    breakTime: timed && entry.break_minutes ? formatDuration(entry.break_minutes) : '',
-    end: formatClock(entry.end_time),
-    duration: timed ? formatDuration(entry.work_minutes) : '',
-    code: entry.code ?? '',
-    recordedOn: formatDateDE(entry.recorded_on),
+    ...entryData(entry),
+    breakTime: timed ? formatPause(entry.break_minutes) : '',
+    duration: timed ? formatHours(entry.work_minutes) : '',
+    // „aufgezeichnet am“ zeigt den Kalendertag des Eintrags.
+    recordedOn: formatDateDE(entry.work_date),
     // Vom Chef erfasste oder korrigierte Zeilen werden markiert.
     recordedByEmployer: entry.recorded_by !== employeeId,
-    remarks: entry.remarks,
   };
 }
 
-// Eine Tageszelle der Einsatzliste: Stunden + Unterschrift; "raw" ist der Text zum Bearbeiten ("12:00-16:00").
+// Eine Tageszelle der Einsatzliste: Stunden + Unterschrift.
 export function rosterCell(entry, employeeId, signatureImage = null) {
   const timed = entry.start_time != null;
   const ownEntry = entry.recorded_by === employeeId;
   return {
-    duration: timed ? formatDuration(entry.work_minutes) : '',
-    raw: timed ? `${formatClock(entry.start_time)}-${formatClock(entry.end_time)}` : (entry.code ?? ''),
-    code: entry.code ?? '',
+    ...entryData(entry),
+    duration: timed ? formatHours(entry.work_minutes) : '',
     signatureId: ownEntry ? entry.signature_id : null,
     signature: ownEntry ? signatureImage : null,
     recordedByEmployer: !ownEntry,
@@ -63,18 +68,18 @@ export async function buildEmployeeSheet(store, employee, ym) {
   }
 
   const totalMinutes = entries.reduce((sum, e) => sum + e.work_minutes, 0);
+  const monthEnd = monthEndISO(month);
 
-  // Mitarbeiter-Unterschrift: die Unterschrift des zuletzt selbst erfassten Eintrags, datiert auf diesen Tag.
+  // Mitarbeiter-Unterschrift: die Unterschrift des zuletzt selbst erfassten Eintrags.
   const signed = entries.filter((e) => e.signature_id && e.recorded_by === employee.id);
   const lastSigned = signed.reduce((a, e) => (!a || e.recorded_on >= a.recorded_on ? e : a), null);
   const employeeSignature = lastSigned
-    ? signatureBlock(await store.getSignature(lastSigned.signature_id), lastSigned.recorded_on)
+    ? signatureBlock(await store.getSignature(lastSigned.signature_id), monthEnd)
     : null;
 
-  // Arbeitgeber-Unterschrift: datiert auf den letzten Eintrag des Monats (inkl. Korrekturen durch den Chef).
-  const lastRecorded = maxDate(entries.map((e) => e.recorded_on));
-  const employerSignature = lastRecorded
-    ? signatureBlock(await store.employerSignatureAt(lastRecorded), lastRecorded)
+  // Arbeitgeber-Unterschrift: sobald der Monat Einträge hat.
+  const employerSignature = entries.length
+    ? signatureBlock(await store.employerSignatureAt(monthEnd), monthEnd)
     : null;
 
   return {
@@ -87,8 +92,7 @@ export async function buildEmployeeSheet(store, employee, ym) {
     rows,
     entries,
     totalMinutes,
-    total: formatDuration(totalMinutes),
-    totalDecimal: formatDecimalHours(totalMinutes),
+    total: formatHours(totalMinutes),
     employeeSignature,
     employerSignature,
   };
@@ -101,12 +105,13 @@ async function rosterEmployees(store, month) {
   return (await store.employeesForMonth(month)).filter((u) => u.on_roster);
 }
 
-// Unterschrift des Arbeitgebers unten auf der Einsatzliste: datiert auf den letzten Eintrag aller Mitarbeiter.
+// Unterschrift des Arbeitgebers unten auf der Einsatzliste, sobald jemand im Monat eingetragen ist.
 export async function rosterEmployerSignature(store, month, entries, users) {
   const ids = new Set((users ?? await rosterEmployees(store, month)).map((u) => u.id));
   const all = entries ?? await store.listMonthEntries(month);
-  const lastRecorded = maxDate(all.filter((e) => ids.has(e.user_id)).map((e) => e.recorded_on));
-  return lastRecorded ? signatureBlock(await store.employerSignatureAt(lastRecorded), lastRecorded) : null;
+  if (!all.some((e) => ids.has(e.user_id))) return null;
+  const monthEnd = monthEndISO(month);
+  return signatureBlock(await store.employerSignatureAt(monthEnd), monthEnd);
 }
 
 export async function buildRoster(store, ym) {
@@ -129,7 +134,7 @@ export async function buildRoster(store, ym) {
       signature_id: u.signature_id,
       days,
       totalMinutes,
-      total: own.length ? formatDuration(totalMinutes) : '',
+      total: own.length ? formatHours(totalMinutes) : '',
     };
   });
 

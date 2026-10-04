@@ -64,6 +64,20 @@ export function formatDecimalHours(minutes) {
   return (minutes / 60).toFixed(2).replace('.', ',');
 }
 
+// Stunden wie in der Lohnabrechnung – keine Uhrzeit, sondern eine Menge: 270 Min. → "4,50 h".
+export function formatHours(minutes) {
+  if (minutes == null) return '';
+  return `${formatDecimalHours(minutes)}\u00a0h`;
+}
+
+// Pause in Minuten: 30 → "30 min".
+export function formatPause(minutes) {
+  return minutes ? `${minutes}\u00a0min` : '';
+}
+
+// Mehr Arbeitszeit an einem Tag ist ein Tippfehler (z. B. Beginn und Ende vertauscht).
+export const MAX_WORK_MINUTES = 16 * 60;
+
 // Arbeitszeit = Ende − Beginn − Pause. Ende vor Beginn bedeutet Schicht über Mitternacht.
 export function computeWorkMinutes(start, end, breakMinutes) {
   let gross = end - start;
@@ -71,6 +85,7 @@ export function computeWorkMinutes(start, end, breakMinutes) {
   if (gross < 0) gross += 24 * 60;
   const net = gross - breakMinutes;
   if (net <= 0) throw new InputError('Die Pause ist länger als die Anwesenheitszeit.');
+  if (net > MAX_WORK_MINUTES) throw new InputError('Mehr als 16 Stunden an einem Tag? Bitte Beginn und Ende prüfen.');
   return net;
 }
 
@@ -134,4 +149,10 @@ export function monthLabel({ year, month }) {
 
 export function isoDate({ year, month }, day) {
   return `${year}-${pad(month)}-${pad(day)}`;
+}
+
+// Letzter Tag eines Monats ("2026-10" → "2026-10-31") – das Datum neben den Unterschriften.
+export function monthEndISO(month) {
+  const [year, m] = month.split('-').map(Number);
+  return isoDate({ year, month: m }, daysInMonth(year, m));
 }

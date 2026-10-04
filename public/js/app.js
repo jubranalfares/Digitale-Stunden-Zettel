@@ -1,4 +1,4 @@
-// Browser-Logik: Unterschriftenfeld, Erfassungsformular, Logo-Upload, Sicherheitsabfragen.
+// Browser-Logik: Unterschriftenfeld, Eingabefenster im Heft, Logo-Upload, Sicherheitsabfragen, Hell/Dunkel.
 (() => {
   'use strict';
 
@@ -190,36 +190,19 @@
     });
   });
 
-  // ---- Heft: direkt ins Formular schreiben ----------------------------------
+  // ---- Heft: Tag antippen, im Eingabefenster erfassen ------------------------
 
-  const CODES = ['K', 'U', 'UU', 'F', 'SA', 'SU'];
-
-  // "12" → "12:00", "930" → "09:30", "12.30" → "12:30"; '' bleibt leer, null = nicht erkannt.
-  const normClock = (value) => {
-    const s = String(value).trim();
-    if (!s) return '';
-    const m = /^(\d{1,2})(?:[:.,]?(\d{2}))?$/.exec(s);
-    if (!m || Number(m[1]) > 23 || Number(m[2] ?? 0) > 59) return null;
-    return `${pad(Number(m[1]))}:${pad(Number(m[2] ?? 0))}`;
-  };
-
-  // Pause: "30" → 0:30, "1" → 1:00, "130" → 1:30, "0,5" → 0:30.
-  const normPause = (value) => {
-    const s = String(value).trim();
-    if (!s) return '';
-    let m;
-    let min = null;
-    if ((m = /^(\d{1,2})[:.](\d{2})$/.exec(s))) min = Number(m[1]) * 60 + Number(m[2]);
-    else if (/^\d$/.test(s)) min = Number(s) * 60;
-    else if (/^\d{2}$/.test(s)) min = Number(s);
-    else if ((m = /^(\d{1,2})(\d{2})$/.exec(s)) && Number(m[2]) < 60) min = Number(m[1]) * 60 + Number(m[2]);
-    else if ((m = /^(\d{1,2}),(\d{1,2})$/.exec(s))) min = Math.round(Number(`${m[1]}.${m[2]}`) * 60);
-    if (min == null) return null;
-    return min ? fmt(min) : '';
-  };
+  // 270 → "4,50 h" (Stunden als Menge, nicht als Uhrzeit)
+  const hoursText = (min) => `${(min / 60).toFixed(2).replace('.', ',')} h`;
+  const hoursWords = (min) => `${Math.floor(min / 60)} Std.${min % 60 ? ` ${min % 60} Min.` : ''}`;
+  const MAX_WORK = 16 * 60;
+  const dayLabel = (iso) => new Date(`${iso}T12:00:00`).toLocaleDateString('de-DE', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+  });
 
   const heft = document.querySelector('[data-heft]');
-  if (heft) {
+  const dialog = document.querySelector('[data-entry-dialog]');
+  if (heft && dialog) {
     const csrf = heft.dataset.csrf;
     const toastEl = document.querySelector('[data-toast]');
     let toastTimer;
@@ -227,34 +210,26 @@
       toastEl.textContent = message;
       toastEl.className = `toast show toast-${kind}`;
       clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => toastEl.classList.remove('show'), kind === 'ok' ? 2500 : 5000);
+      toastTimer = setTimeout(() => toastEl.classList.remove('show'), kind === 'ok' ? 3000 : 5000);
     };
 
-    // Speichervorgänge nacheinander abarbeiten, damit sich nichts überholt.
-    let queue = Promise.resolve();
-    const send = (payload) => {
-      const run = async () => {
-        let res;
-        try {
-          res = await fetch('/eintrag', {
-            method: 'POST',
-            body: new URLSearchParams({ ...payload, _csrf: csrf }),
-            headers: { Accept: 'application/json' },
-            redirect: 'manual',
-            keepalive: true,
-          });
-        } catch {
-          throw new Error('Keine Verbindung – bitte gleich noch einmal versuchen.');
-        }
-        let data = null;
-        try { data = await res.json(); } catch { /* keine JSON-Antwort */ }
-        if (!data) throw new Error('Sitzung abgelaufen – bitte die Seite neu laden.');
-        if (!res.ok) throw new Error(data.error || 'Speichern fehlgeschlagen.');
-        return data;
-      };
-      const p = queue.then(run, run);
-      queue = p.catch(() => {});
-      return p;
+    const send = async (payload) => {
+      let res;
+      try {
+        res = await fetch('/eintrag', {
+          method: 'POST',
+          body: new URLSearchParams({ ...payload, _csrf: csrf }),
+          headers: { Accept: 'application/json' },
+          redirect: 'manual',
+        });
+      } catch {
+        throw new Error('Keine Verbindung – bitte gleich noch einmal versuchen.');
+      }
+      let data = null;
+      try { data = await res.json(); } catch { /* keine JSON-Antwort */ }
+      if (!data) throw new Error('Sitzung abgelaufen – bitte die Seite neu laden.');
+      if (!res.ok) throw new Error(data.error || 'Speichern fehlgeschlagen.');
+      return data;
     };
 
     const setSignature = (key, sig) => {
@@ -266,94 +241,250 @@
       document.querySelectorAll(`[data-sig-date="${key}"]`).forEach((el) => { el.textContent = sig ? sig.date : ''; });
     };
 
-    const savedMessage = (data) => (data.total ? `✓ Gespeichert · Monatssumme ${data.total} Std.` : '✓ Gespeichert');
+    // ---- Eingabefenster
+    const $ = (sel) => dialog.querySelector(sel);
+    const form = $('[data-entry-form]');
+    const remarksInput = $('[data-remarks]');
+    const saveBtn = $('[data-entry-save]');
+    const deleteBtn = $('[data-entry-delete]');
+    const errorEl = $('[data-entry-error]');
+    const pauseChips = $('[data-pause-chips]');
+    let target = null; // Zeile bzw. Zelle, die gerade bearbeitet wird
+    let state = null;
+    let busy = false;
 
-    // ---- Stundenzettel: eine Zeile = ein Tag
-    const FIELDS = ['beginn', 'pause', 'ende', 'kuerzel', 'bemerkung'];
-    const rows = [...document.querySelectorAll('tr[data-row]')];
-    rows.forEach((tr, index) => {
-      const f = Object.fromEntries(FIELDS.map((n) => [n, tr.querySelector(`[name="${n}"]`)]));
-      const snapshot = () => FIELDS.map((n) => f[n].value).join('|');
-      let saved = snapshot();
+    const timeOf = (t) => (t ? `${pad(t.h)}:${pad(t.m)}` : '');
+    const toTime = (s) => {
+      const min = parseClock(s);
+      return min == null ? null : { h: Math.floor(min / 60), m: min % 60 };
+    };
+    const minutesOf = (t) => t.h * 60 + t.m;
 
-      const commit = async () => {
-        const start = normClock(f.beginn.value);
-        const end = normClock(f.ende.value);
-        const pause = normPause(f.pause.value);
-        if (start === null || end === null || pause === null) {
-          tr.classList.add('row-error');
-          toast('Uhrzeit nicht erkannt – z. B. 12 oder 12:30 eingeben.', 'error');
-          return;
-        }
-        f.beginn.value = start;
-        f.ende.value = end;
-        f.pause.value = pause;
-        if (snapshot() === saved) {
-          tr.classList.remove('row-error', 'row-pending');
-          return;
-        }
-        if (!start !== !end) {
-          tr.classList.add('row-pending');
-          toast(start ? 'Ende fehlt noch.' : 'Beginn fehlt noch.', 'warn');
-          return;
-        }
-        tr.classList.remove('row-error', 'row-pending');
-        tr.classList.add('row-saving');
-        const sent = snapshot();
-        const payload = { user: tr.dataset.user, datum: tr.dataset.date };
-        FIELDS.forEach((n) => { payload[n] = f[n].value; });
-        try {
-          const data = await send(payload);
-          if (snapshot() === sent) FIELDS.forEach((n) => { f[n].value = data.row[n]; });
-          saved = snapshot() === sent ? snapshot() : sent;
-          tr.querySelector('[data-out="dauer"]').textContent = data.row.dauer;
-          const rec = tr.querySelector('[data-out="aufgezeichnet"]');
-          rec.textContent = data.row.aufgezeichnet;
-          if (data.row.ag) {
-            const small = document.createElement('small');
-            small.textContent = 'AG';
-            rec.append(' ', small);
-            document.querySelector('[data-ag-note]')?.removeAttribute('hidden');
-          }
-          document.querySelectorAll('[data-out="total"]').forEach((el) => { el.textContent = data.total; });
-          setSignature('employee', data.employeeSignature);
-          setSignature('employer', data.employerSignature);
-          toast(savedMessage(data));
-        } catch (err) {
-          tr.classList.add('row-error');
-          toast(err.message, 'error');
-        } finally {
-          tr.classList.remove('row-saving');
-        }
-      };
+    // Arbeitszeit wie auf dem Server: Ende vor Beginn = über Mitternacht.
+    function work() {
+      if (!state.start || !state.end) return null;
+      let gross = minutesOf(state.end) - minutesOf(state.start);
+      if (gross === 0) return { error: 'Beginn und Ende sind gleich.' };
+      const overnight = gross < 0;
+      if (overnight) gross += 24 * 60;
+      const net = gross - state.pause;
+      if (net <= 0) return { error: 'Die Pause ist länger als die Arbeitszeit.' };
+      if (net > MAX_WORK) return { error: 'Mehr als 16 Stunden? Bitte Beginn und Ende prüfen.' };
+      return { net, overnight };
+    }
 
-      // Gespeichert wird, sobald man die Zeile verlässt.
-      tr.addEventListener('focusout', (e) => {
-        if (!tr.contains(e.relatedTarget)) commit();
+    function render() {
+      for (const field of ['start', 'end']) {
+        $(`[data-tile-value="${field}"]`).textContent = timeOf(state[field]) || '––:––';
+        $(`[data-tile="${field}"]`).classList.toggle('active', state.step?.field === field);
+        $(`[data-tile="${field}"]`).classList.toggle('filled', !!state[field]);
+      }
+      const picker = $('[data-picker]');
+      picker.hidden = !state.step;
+      if (state.step) {
+        const { field, part } = state.step;
+        const current = state[field];
+        const label = field === 'start' ? 'Beginn' : 'Ende';
+        $('[data-picker-head]').textContent = part === 'hour'
+          ? `${label}: Stunde wählen`
+          : `${label}: ${pad(current?.h ?? 0)}:__ – Minuten wählen`;
+        $('[data-grid="hour"]').hidden = part !== 'hour';
+        $('[data-grid="minute"]').hidden = part !== 'minute';
+        dialog.querySelectorAll('[data-hour]').forEach((b) => {
+          b.classList.toggle('selected', current?.h === Number(b.dataset.hour));
+        });
+        dialog.querySelectorAll('[data-minute]').forEach((b) => {
+          b.classList.toggle('selected', part === 'minute' && current?.m === Number(b.dataset.minute));
+        });
+      }
+      $('[data-clear-times]').hidden = !(state.start || state.end);
+
+      // Pause: eine ungewöhnliche alte Pause (z. B. 20 min) bekommt einen eigenen Knopf.
+      pauseChips.querySelector('[data-extra]')?.remove();
+      if (![...pauseChips.querySelectorAll('[data-pause]')].some((b) => Number(b.dataset.pause) === state.pause)) {
+        const extra = Object.assign(document.createElement('button'), {
+          type: 'button', className: 'chip-btn', textContent: `${state.pause} min`,
+        });
+        extra.dataset.pause = state.pause;
+        extra.dataset.extra = '';
+        pauseChips.append(extra);
+      }
+      pauseChips.querySelectorAll('[data-pause]').forEach((b) => {
+        b.setAttribute('aria-pressed', String(Number(b.dataset.pause) === state.pause));
       });
-      tr.addEventListener('keydown', (e) => {
-        if (e.key !== 'Enter' || e.target.tagName === 'SELECT') return;
-        e.preventDefault();
-        const next = rows[index + 1]?.querySelector(`[name="${e.target.name}"]`);
-        if (next) next.focus();
-        else e.target.blur();
+      dialog.querySelectorAll('[data-code]').forEach((b) => {
+        b.setAttribute('aria-pressed', String(b.dataset.code === state.code));
+      });
+
+      // Zusammenfassung und ob gespeichert werden kann
+      const summary = $('[data-entry-summary]');
+      const w = work();
+      let ok = false;
+      summary.className = 'entry-summary';
+      if (w?.error) {
+        summary.textContent = w.error;
+        summary.classList.add('bad');
+      } else if (w) {
+        summary.innerHTML = '';
+        summary.append('Arbeitszeit ', Object.assign(document.createElement('strong'), { textContent: hoursText(w.net) }));
+        summary.append(` = ${hoursWords(w.net)}${w.overnight ? ' (über Mitternacht)' : ''}`);
+        summary.classList.add('good');
+        ok = true;
+      } else if (state.start || state.end) {
+        summary.textContent = state.start ? 'Jetzt das Ende wählen.' : 'Jetzt den Beginn wählen.';
+      } else if (state.code || state.remarks.trim()) {
+        summary.textContent = state.code ? `Ganzer Tag: ${$(`[data-code="${state.code}"]`).dataset.label}` : 'Nur Bemerkung';
+        ok = true;
+      } else {
+        summary.textContent = 'Beginn und Ende wählen.';
+      }
+      saveBtn.disabled = !ok || busy;
+      deleteBtn.hidden = !state.exists;
+    }
+
+    function open(el) {
+      target = el;
+      const d = el.dataset;
+      state = {
+        exists: !!(d.start || d.code || d.remarks),
+        start: toTime(d.start),
+        end: toTime(d.end),
+        pause: Number(d.pause) || 0,
+        code: d.code || '',
+        remarks: d.remarks || '',
+        step: null,
+      };
+      // Leerer Tag: gleich mit der Stunde für den Beginn anfangen.
+      if (!state.start) state.step = { field: 'start', part: 'hour' };
+      remarksInput.value = state.remarks;
+      errorEl.hidden = true;
+      $('[data-entry-title]').textContent = dayLabel(d.date);
+      $('[data-entry-name]').textContent = d.name || '';
+      render();
+      if (dialog.showModal) dialog.showModal(); else dialog.setAttribute('open', '');
+      $('[data-entry-title]').focus();
+    }
+
+    const close = () => {
+      if (dialog.close) dialog.close(); else dialog.removeAttribute('open');
+    };
+
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) return close(); // Tipp neben das Fenster
+      const btn = e.target.closest('button');
+      if (!btn || !state) return;
+      if (btn.matches('[data-entry-close]')) return close();
+      if (btn.dataset.tile) {
+        state.step = { field: btn.dataset.tile, part: 'hour' };
+      } else if (btn.dataset.hour) {
+        const { field } = state.step;
+        state[field] = { h: Number(btn.dataset.hour), m: state[field]?.m ?? 0 };
+        state.step = { field, part: 'minute' };
+      } else if (btn.dataset.minute) {
+        const { field } = state.step;
+        state[field] = { h: state[field]?.h ?? 0, m: Number(btn.dataset.minute) };
+        // Nach dem Beginn geht es mit dem Ende weiter; danach ist die Auswahl fertig.
+        state.step = field === 'start' && !state.end ? { field: 'end', part: 'hour' } : null;
+      } else if (btn.dataset.pause) {
+        state.pause = Number(btn.dataset.pause);
+      } else if (btn.dataset.code) {
+        state.code = state.code === btn.dataset.code ? '' : btn.dataset.code;
+      } else if (btn.matches('[data-clear-times]')) {
+        state.start = null;
+        state.end = null;
+        state.pause = 0;
+        state.step = { field: 'start', part: 'hour' };
+      } else if (btn.matches('[data-entry-delete]')) {
+        if (window.confirm(`Eintrag vom ${dayLabel(target.dataset.date)} löschen?`)) {
+          save({ beginn: '', ende: '', pause: '', kuerzel: '', bemerkung: '' });
+        }
+        return;
+      } else {
+        return;
+      }
+      render();
+    });
+
+    remarksInput.addEventListener('input', () => {
+      state.remarks = remarksInput.value;
+      render();
+    });
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (saveBtn.disabled) return;
+      save({
+        beginn: timeOf(state.start),
+        ende: timeOf(state.end),
+        pause: state.start && state.pause ? fmt(state.pause) : '',
+        kuerzel: state.code,
+        bemerkung: state.remarks.trim(),
       });
     });
 
-    // ---- Einsatzliste: "12-16" direkt in die Zelle
-    const parseCell = (text) => {
-      const s = text.trim();
-      if (!s) return { beginn: '', ende: '', pause: '', kuerzel: '', bemerkung: '' };
-      if (CODES.includes(s.toUpperCase())) return { beginn: '', ende: '', kuerzel: s.toUpperCase() };
-      const m = /^(\d{1,2}(?:[:.,]?\d{2})?)\s*(?:-|–|—|bis|\s)\s*(\d{1,2}(?:[:.,]?\d{2})?)$/i.exec(s);
-      if (!m) return null;
-      const beginn = normClock(m[1]);
-      const ende = normClock(m[2]);
-      if (!beginn || !ende) return null;
-      return { beginn, ende, kuerzel: '' };
-    };
+    // Gespeicherten Tag im Formular anzeigen.
+    function showSaved(el, data) {
+      const entry = data.entry;
+      Object.assign(el.dataset, {
+        start: entry?.start ?? '',
+        end: entry?.end ?? '',
+        pause: entry?.breakMinutes ?? 0,
+        code: entry?.code ?? '',
+        remarks: entry?.remarks ?? '',
+      });
+      if (el.matches('tr')) {
+        for (const [key, value] of Object.entries(data.row)) {
+          const out = el.querySelector(`[data-out="${key}"]`);
+          if (out) out.textContent = value;
+        }
+        el.querySelector('[data-out="bemerkung"]').title = data.row.bemerkung;
+        if (data.row.ag && data.row.aufgezeichnet) {
+          el.querySelector('[data-out="aufgezeichnet"]').append(' ', Object.assign(document.createElement('small'), { textContent: 'AG' }));
+          document.querySelector('[data-ag-note]')?.removeAttribute('hidden');
+        }
+        document.querySelectorAll('[data-out="total"]').forEach((out) => { out.textContent = data.total; });
+        setSignature('employee', data.employeeSignature);
+        setSignature('employer', data.employerSignature);
+      } else {
+        renderCell(el.querySelector('[data-cell-view]'), data.cell);
+        document.querySelectorAll(`[data-sum-user="${el.dataset.user}"]`).forEach((out) => { out.textContent = data.total; });
+        setSignature('roster-employer', data.rosterEmployerSignature);
+      }
+      el.classList.remove('just-saved');
+      void el.offsetWidth; // Animation neu starten
+      el.classList.add('just-saved');
+    }
 
-    const renderCell = (view, cell) => {
+    async function save(fields) {
+      busy = true;
+      saveBtn.textContent = 'Speichert …';
+      render();
+      errorEl.hidden = true;
+      try {
+        const data = await send({ user: target.dataset.user, datum: target.dataset.date, ...fields });
+        showSaved(target, data);
+        close();
+        toast(data.entry
+          ? `✓ Gespeichert${data.day ? ` – ${data.day}` : ''} · Monat ${data.total || '0,00\u00a0h'}`
+          : '✓ Eintrag gelöscht');
+      } catch (err) {
+        errorEl.textContent = err.message;
+        errorEl.hidden = false;
+      } finally {
+        busy = false;
+        saveBtn.textContent = 'Speichern';
+        if (dialog.open) render();
+      }
+    }
+
+    // Tag antippen (die ganze Zeile bzw. Zelle ist die Fläche)
+    heft.addEventListener('click', (e) => {
+      const el = e.target.closest('[data-entry]');
+      if (el && !e.target.closest('a')) open(el);
+    });
+
+    // ---- Einsatzliste: Tageszelle neu zeichnen
+    function renderCell(view, cell) {
       view.replaceChildren();
       if (!cell) return;
       const text = document.createElement('div');
@@ -371,62 +502,15 @@
       } else if (cell.ag) {
         view.append(Object.assign(document.createElement('span'), { className: 'rc-ag', textContent: 'AG' }));
       }
-    };
-
-    const cells = [...document.querySelectorAll('input[data-cell]')];
-    cells.forEach((input) => {
-      let saved = input.value;
-      const td = input.closest('td');
-      input.addEventListener('focus', () => input.select());
-      input.addEventListener('keydown', (e) => {
-        if (e.key !== 'Enter') return;
-        e.preventDefault();
-        const sameColumn = cells.filter((c) => c.dataset.user === input.dataset.user);
-        const next = sameColumn[sameColumn.indexOf(input) + 1];
-        if (next) next.focus();
-        else input.blur();
-      });
-      input.addEventListener('blur', async () => {
-        if (input.value.trim() === saved.trim()) return;
-        const parsed = parseCell(input.value);
-        if (!parsed) {
-          td.classList.add('cell-error');
-          toast('Bitte z. B. 12-16 eintragen (oder U, K, F …).', 'error');
-          return;
-        }
-        td.classList.remove('cell-error');
-        td.classList.add('cell-saving');
-        try {
-          const data = await send({ user: input.dataset.user, datum: input.dataset.date, ...parsed });
-          input.value = data.cell ? data.cell.raw : '';
-          saved = input.value;
-          renderCell(td.querySelector('[data-cell-view]'), data.cell);
-          document.querySelectorAll(`[data-sum-user="${input.dataset.user}"]`).forEach((el) => { el.textContent = data.total; });
-          setSignature('roster-employer', data.rosterEmployerSignature);
-          toast(data.cell?.duration ? `✓ ${data.cell.duration} Std. · Monatssumme ${data.total} Std.` : savedMessage(data));
-        } catch (err) {
-          td.classList.add('cell-error');
-          toast(err.message, 'error');
-        } finally {
-          td.classList.remove('cell-saving');
-        }
-      });
-    });
-
-    // Beim Verlassen der Seite das gerade bearbeitete Feld noch speichern.
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'hidden' && document.activeElement?.matches('.cell-in, .rc-in')) {
-        document.activeElement.blur();
-      }
-    });
+    }
 
     // Auf dem Handy: Formular so verschieben, dass die Tabelle bzw. die eigene Spalte sichtbar ist.
     document.querySelectorAll('[data-scroll]').forEach((scroller) => {
       if (scroller.scrollWidth <= scroller.clientWidth) return;
-      const target = scroller.querySelector('td.name.own') ?? scroller.querySelector('table');
-      if (!target) return;
-      const left = target.getBoundingClientRect().left - scroller.getBoundingClientRect().left + scroller.scrollLeft;
-      scroller.scrollLeft = target.matches('td') ? left - (scroller.clientWidth - target.offsetWidth) / 2 : left - 8;
+      const own = scroller.querySelector('td.name.own') ?? scroller.querySelector('table');
+      if (!own) return;
+      const left = own.getBoundingClientRect().left - scroller.getBoundingClientRect().left + scroller.scrollLeft;
+      scroller.scrollLeft = own.matches('td') ? left - (scroller.clientWidth - own.offsetWidth) / 2 : left - 8;
     });
     const todayRow = document.querySelector('tr.today');
     if (todayRow && todayRow.getBoundingClientRect().bottom > window.innerHeight) {

@@ -31,21 +31,19 @@
       <tbody style="font-size:<%= pt(T.bodySize) %>">
         <tr style="height:<%= pt(T.rowH) %>"><% T.cols.forEach(() => { %><td></td><% }) %></tr>
         <% sheet.rows.forEach((r) => { %>
-          <% if (canType(r)) { const tag = `${r.day}.`; %>
-            <tr style="height:<%= pt(T.rowH) %>" class="<%= r.date === today ? 'today' : '' %>" data-row data-user="<%= sheet.employee.id %>" data-date="<%= r.date %>">
-              <td><%= r.day %></td>
-              <td><input class="cell-in" name="beginn" value="<%= r.start || '' %>" inputmode="numeric" autocomplete="off" enterkeyhint="next" aria-label="Beginn <%= tag %>"></td>
-              <td><input class="cell-in" name="pause" value="<%= r.breakTime || '' %>" inputmode="numeric" autocomplete="off" enterkeyhint="next" aria-label="Pause <%= tag %>"></td>
-              <td><input class="cell-in" name="ende" value="<%= r.end || '' %>" inputmode="numeric" autocomplete="off" enterkeyhint="next" aria-label="Ende <%= tag %>"></td>
+          <% if (canType(r)) { %>
+            <tr style="height:<%= pt(T.rowH) %>" class="editable <%= r.date === today ? 'today' : '' %>" data-entry
+                data-user="<%= sheet.employee.id %>" data-name="<%= sheet.employee.name %>" data-date="<%= r.date %>"
+                data-start="<%= r.start || '' %>" data-end="<%= r.end || '' %>" data-pause="<%= r.breakMinutes || 0 %>"
+                data-code="<%= r.code || '' %>" data-remarks="<%= r.remarks || '' %>">
+              <td><button type="button" class="day-btn" data-edit aria-label="<%= r.day %>. <%= sheet.monthLabel %> eintragen"><%= r.day %></button></td>
+              <td data-out="beginn"><%= r.start || '' %></td>
+              <td data-out="pause"><%= r.breakTime || '' %></td>
+              <td data-out="ende"><%= r.end || '' %></td>
               <td data-out="dauer"><%= r.duration || '' %></td>
-              <td class="code">
-                <select class="cell-in" name="kuerzel" aria-label="Kürzel <%= tag %>">
-                  <option value=""></option>
-                  <% codes.forEach(([code, text]) => { %><option value="<%= code %>" title="<%= text %>" <%= r.code === code ? 'selected' : '' %>><%= code %></option><% }) %>
-                </select>
-              </td>
+              <td class="code" data-out="kuerzel"><%= r.code || '' %></td>
               <td class="ag" data-out="aufgezeichnet"><%= r.recordedOn || '' %><% if (r.recordedByEmployer) { %> <small>AG</small><% } %></td>
-              <td class="remarks"><input class="cell-in" name="bemerkung" value="<%= r.remarks || '' %>" maxlength="200" autocomplete="off" enterkeyhint="done" aria-label="Bemerkung <%= tag %>"></td>
+              <td class="remarks" data-out="bemerkung" title="<%= r.remarks || '' %>"><%= r.remarks || '' %></td>
             </tr>
           <% } else { %>
             <tr style="height:<%= pt(T.rowH) %>" class="<%= r.exists ? '' : 'missing' %>">

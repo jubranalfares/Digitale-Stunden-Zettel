@@ -110,23 +110,30 @@ test('Erste Anmeldung: eigenes Passwort und Unterschrift', async () => {
   assert.equal((await anna.get('/')).location, '/zettel');
 });
 
-test('Heft: Stundenzettel ist direkt beschreibbar', async () => {
+const h = (text) => text.replace(' ', '\u00a0');
+const entryAttr = (userId, date) => new RegExp(`data-user="${userId}" data-name="[^"]*" data-date="${date}"`);
+
+test('Heft: Tage im Stundenzettel lassen sich antippen', async () => {
+  const user = await store.getUserByUsername('anna');
   const page = await anna.get('/zettel');
   assert.equal(page.status, 200);
-  assert.match(page.data, new RegExp(`data-row data-user="\\d+" data-date="${today}"`));
-  assert.match(page.data, /name="beginn"/);
+  assert.match(page.data, entryAttr(user.id, today));
+  assert.match(page.data, /data-entry-dialog/);
+  assert.match(page.data, /data-hour="23"/);
   assert.match(page.data, /Mein Stundenzettel/);
 });
 
-test('12 bis 16 Uhr eintragen ergibt 4:00 Std. – mit Summe und Unterschriften', async () => {
+test('12 bis 16 Uhr eintragen ergibt 4,00 h – mit Summe und Unterschriften', async () => {
   const user = await store.getUserByUsername('anna');
-  const res = await anna.post('/eintrag', { user: user.id, ...day(today), beginn: '12', ende: '16' });
+  const res = await anna.post('/eintrag', { user: user.id, ...day(today), beginn: '12:00', ende: '16:00' });
   assert.equal(res.status, 200);
   assert.equal(res.data.row.beginn, '12:00');
   assert.equal(res.data.row.ende, '16:00');
-  assert.equal(res.data.row.dauer, '4:00');
-  assert.equal(res.data.total, '4:00');
-  assert.equal(res.data.cell.duration, '4:00');
+  assert.equal(res.data.row.dauer, h('4,00 h'));
+  assert.equal(res.data.day, h('4,00 h'));
+  assert.equal(res.data.total, h('4,00 h'));
+  assert.equal(res.data.cell.duration, h('4,00 h'));
+  assert.deepEqual(res.data.entry, { start: '12:00', end: '16:00', breakMinutes: 0, code: '', remarks: '' });
   assert.ok(res.data.employeeSignature, 'Mitarbeiter-Unterschrift gesetzt');
   assert.ok(res.data.employerSignature, 'Arbeitgeber-Unterschrift gesetzt');
   assert.ok(res.data.rosterEmployerSignature, 'Einsatzliste unterschrieben');
@@ -135,13 +142,35 @@ test('12 bis 16 Uhr eintragen ergibt 4:00 Std. – mit Summe und Unterschriften'
   assert.equal(entry.recorded_on, today);
 });
 
-test('Einsatzliste: "12-19" behält die Pause aus dem Stundenzettel', async () => {
+test('Pause in Minuten, Stunden mit Komma; ohne Pause-Feld bleibt die Pause erhalten', async () => {
   const user = await store.getUserByUsername('anna');
-  await anna.post('/eintrag', { user: user.id, ...day(today), beginn: '11:00', pause: '30', ende: '18:00' });
+  await anna.post('/eintrag', { user: user.id, ...day(today), beginn: '11:00', pause: '0:30', ende: '18:00' });
   const res = await anna.post('/eintrag', { user: user.id, datum: today, beginn: '12:00', ende: '19:00', kuerzel: '' });
-  assert.equal(res.data.row.pause, '0:30');
-  assert.equal(res.data.row.dauer, '6:30');
-  assert.equal(res.data.cell.raw, '12:00-19:00');
+  assert.equal(res.data.row.pause, h('30 min'));
+  assert.equal(res.data.row.dauer, h('6,50 h'));
+  assert.equal(res.data.entry.breakMinutes, 30);
+});
+
+test('Datum neben den Unterschriften ist der letzte Tag des Monats, „aufgezeichnet am“ der Kalendertag', async () => {
+  const user = await store.getUserByUsername('anna');
+  const first = `${today.slice(0, 7)}-01`;
+  const res = await anna.post('/eintrag', { user: user.id, ...day(first), beginn: '10:00', ende: '14:30' });
+  assert.equal(res.status, 200);
+  assert.equal(res.data.row.aufgezeichnet, `01.${today.slice(5, 7)}.${today.slice(0, 4)}`);
+  const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const monthEnd = `${lastDay}.${today.slice(5, 7)}.${today.slice(0, 4)}`;
+  assert.equal(res.data.employeeSignature.date, monthEnd);
+  assert.equal(res.data.employerSignature.date, monthEnd);
+  assert.equal(res.data.rosterEmployerSignature.date, monthEnd);
+  assert.equal(res.data.total, h(today === first ? '4,50 h' : '11,00 h'));
+  await anna.post('/eintrag', { user: user.id, ...day(first) });
+});
+
+test('Mehr als 16 Stunden an einem Tag gelten als Tippfehler', async () => {
+  const user = await store.getUserByUsername('anna');
+  const res = await anna.post('/eintrag', { user: user.id, ...day(today), beginn: '16:30', ende: '15:20' });
+  assert.equal(res.status, 400);
+  assert.match(res.data.error, /16 Stunden/);
 });
 
 test('Feld leeren löscht den Tag', async () => {
@@ -190,18 +219,18 @@ test('Einsatzliste: Mitarbeiterin schreibt nur in die eigene Spalte', async () =
   const ben = await store.getUserByUsername('ben');
   const page = await anna.get('/einsatzliste');
   assert.equal(page.status, 200);
-  assert.match(page.data, new RegExp(`data-cell data-user="${user.id}" data-date="${today}"`));
-  assert.doesNotMatch(page.data, new RegExp(`data-cell data-user="${ben.id}"`));
+  assert.match(page.data, entryAttr(user.id, today));
+  assert.doesNotMatch(page.data, new RegExp(`data-user="${ben.id}" data-name`));
   assert.match(page.data, /Ben Bauer/);
 });
 
 test('Chef schreibt für alle – als AG gekennzeichnet', async () => {
   const ben = await store.getUserByUsername('ben');
   const page = await chef.get('/einsatzliste');
-  assert.match(page.data, new RegExp(`data-cell data-user="${ben.id}"`));
-  const res = await chef.post('/eintrag', { user: ben.id, datum: today, beginn: '17', ende: '22', kuerzel: '' });
+  assert.match(page.data, entryAttr(ben.id, today));
+  const res = await chef.post('/eintrag', { user: ben.id, datum: today, beginn: '17:00', ende: '22:00', kuerzel: '' });
   assert.equal(res.status, 200);
-  assert.equal(res.data.cell.duration, '5:00');
+  assert.equal(res.data.cell.duration, h('5,00 h'));
   assert.equal(res.data.cell.ag, true);
   assert.equal(res.data.cell.signatureId, null);
   assert.equal(res.data.row.ag, true);

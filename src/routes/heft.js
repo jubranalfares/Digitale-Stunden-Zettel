@@ -1,5 +1,5 @@
-// Das digitale Heft: Einsatzliste und Stundenzettel, direkt im Formular ausfüllen.
-// Jede Änderung wird sofort gespeichert; Dauer, Summen und Unterschriften rechnet das System.
+// Das digitale Heft: Einsatzliste und Stundenzettel. Ein Tag wird angetippt und im Eingabefenster
+// erfasst; Dauer, Summen und Unterschriften rechnet das System.
 import express from 'express';
 import { requireAdmin, requireLogin } from '../auth.js';
 import { canEdit, earliestEditableDate, saveEntry } from '../entries.js';
@@ -108,19 +108,24 @@ export default function heftRoutes({ store }) {
     const cell = row?.entry ? rosterCell(row.entry, employee.id) : null;
     const sig = (s) => (s ? { id: s.id, date: s.dateLabel } : null);
     res.json({
+      // Rohwerte für das Eingabefenster
+      entry: row?.entry ? {
+        start: row.start, end: row.end, breakMinutes: row.breakMinutes, code: row.code, remarks: row.remarks,
+      } : null,
+      // So steht der Tag auf dem Stundenzettel …
       row: {
         beginn: row?.start ?? '',
         pause: row?.breakTime ?? '',
         ende: row?.end ?? '',
-        kuerzel: row?.code ?? '',
-        bemerkung: row?.remarks ?? '',
         dauer: row?.duration ?? '',
+        kuerzel: row?.code ?? '',
         aufgezeichnet: row?.recordedOn ?? '',
+        bemerkung: row?.remarks ?? '',
         ag: !!row?.recordedByEmployer,
       },
-      cell: cell && {
-        duration: cell.duration, raw: cell.raw, code: cell.code, signatureId: cell.signatureId, ag: cell.recordedByEmployer,
-      },
+      // … und so in der Einsatzliste.
+      cell: cell && { duration: cell.duration, code: cell.code, signatureId: cell.signatureId, ag: cell.recordedByEmployer },
+      day: row?.duration ?? '',
       total: sheet.entries.length ? sheet.total : '',
       employeeSignature: sig(sheet.employeeSignature),
       employerSignature: sig(sheet.employerSignature),

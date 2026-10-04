@@ -59,17 +59,17 @@ test('Online-Datenbank: Einrichten, ins Heft schreiben, PDF', async (t) => {
 
   const roster = await call('/einsatzliste');
   assert.match(roster.data, /Einsatzliste für Minijobber/);
-  const userId = /data-cell data-user="(\d+)"/.exec(roster.data)[1];
-  const today = /data-cell data-user="\d+" data-date="([\d-]+)"/g;
+  const userId = /data-entry data-user="(\d+)"/.exec(roster.data)[1];
+  const today = /data-entry data-user="\d+" data-name="[^"]*" data-date="([\d-]+)"/g;
   let last;
   for (const m of roster.data.matchAll(today)) last = m[1];
 
   const saved = await call('/eintrag', { user: userId, datum: last, beginn: '12', ende: '16', kuerzel: '' });
   assert.equal(saved.status, 200);
   const data = JSON.parse(saved.data);
-  assert.equal(data.cell.duration, '4:00');
-  assert.equal(data.total, '4:00');
-  assert.match((await call('/einsatzliste')).data, /4:00/);
+  assert.equal(data.cell.duration, '4,00\u00a0h');
+  assert.equal(data.total, '4,00\u00a0h');
+  assert.match((await call('/einsatzliste')).data, /4,00\u00a0h/);
 
   const pdf = await call('/pdf');
   assert.equal(pdf.data.subarray(0, 4).toString(), '%PDF');

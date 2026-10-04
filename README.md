@@ -3,11 +3,12 @@
 Das Papier-Heft mit den Stundenzetteln – digital. Man schreibt **direkt ins Formular**, wie auf Papier,
 nur ohne Rechnen und ohne ständiges Unterschreiben:
 
-- **Mitarbeiter** tippen ihre Zeiten in ihren Stundenzettel (*„Vorlage zur Dokumentation der täglichen
-  Arbeitszeit“*) – z. B. `12` und `16`. Dauer, Monatssumme, „aufgezeichnet am“ und die **Unterschrift**
-  setzt das System automatisch. Gespeichert wird von selbst.
-- In der **Einsatzliste** (großes Blatt mit allen Mitarbeitern) schreibt man wie auf Papier `12-16` in die
-  Zelle – daraus werden 4:00 Std., die Zeile **Summe** rechnet mit.
+- **Mitarbeiter** tippen in ihrem Stundenzettel (*„Vorlage zur Dokumentation der täglichen
+  Arbeitszeit“*) auf einen Tag. Im Eingabefenster wählen sie Beginn und Ende mit großen Knöpfen
+  (erst Stunde, dann Minuten), optional Pause und Kürzel, und tippen auf **Speichern**. Dauer,
+  Monatssumme, „aufgezeichnet am“ und die **Unterschrift** setzt das System.
+- In der **Einsatzliste** (großes Blatt mit allen Mitarbeitern) geht es genauso: Zelle antippen,
+  Zeiten wählen, speichern – die Zeile **Summe** rechnet mit.
 - **Der Chef** blättert durch das Heft (Einsatzliste, dann jeder Mitarbeiter), unterschreibt nur einmal
   und lädt mit **einem Knopf** alles als PDF für den Steuerberater herunter.
 
@@ -21,16 +22,17 @@ nur ohne Rechnen und ohne ständiges Unterschreiben:
 
 ## So schreibt man ins Heft
 
-| Wo | Eingabe | Ergebnis |
-|---|---|---|
-| Stundenzettel, Beginn/Ende | `12`, `930`, `12:30` | 12:00, 09:30, 12:30 |
-| Stundenzettel, Pause | `30`, `45`, `1`, `130` | 0:30, 0:45, 1:00, 1:30 |
-| Stundenzettel, Spalte * | K, U, UU, F, SA, SU | Kürzel laut Schlüssel |
-| Einsatzliste, Tageszelle | `12-16`, `12:30-18`, `U`, `K` | 4:00 Std. bzw. Kürzel |
-| überall | Feld leeren | Tag wird gelöscht |
+1. Tag antippen (im Stundenzettel die Zeile, in der Einsatzliste die Zelle).
+2. **Beginn**: Stunde antippen, dann Minuten (in 5-Minuten-Schritten). Danach geht es automatisch mit
+   dem **Ende** weiter.
+3. Optional **Pause** (keine, 15, 30, 45, 60, 90 min) und **Kürzel** (K, U, UU, F, SA, SU) antippen.
+4. **Speichern** – das Fenster schließt sich, der Tag leuchtet kurz grün auf und unten erscheint
+   „✓ Gespeichert – 4,00 h · Monat …“.
 
-Gespeichert wird, sobald man die Zeile bzw. Zelle verlässt (oder Enter drückt). Unten erscheint kurz
-„✓ Gespeichert · Monatssumme …“.
+Stunden stehen überall als Dezimalzahl mit Komma (z. B. **4,50 h** = 4 Std. 30 Min.), Pausen in Minuten.
+„Aufgezeichnet am“ ist der Kalendertag des Eintrags; neben den Unterschriften steht der letzte Tag des
+Monats. Mehr als 16 Stunden an einem Tag lehnt das System als Tippfehler ab. Ein Eintrag lässt sich im
+Fenster über **Löschen** entfernen.
 
 Mitarbeiter schreiben in ihren eigenen Zettel und ihre eigene Spalte der Einsatzliste (laufender und
 Vormonat). Der Chef kann überall eintragen; seine Einträge werden mit **„AG“** gekennzeichnet.
@@ -39,10 +41,10 @@ Vormonat). Der Chef kann überall eintragen; seine Einträge werden mit **„AG�
 
 | Stelle | Unterschrift | Datum |
 |---|---|---|
-| Stundenzettel, „Unterschrift des Arbeitnehmers“ | Mitarbeiter | Tag des letzten eigenen Eintrags im Monat |
-| Stundenzettel, „Unterschrift des Arbeitgebers“ | Chef | Tag des letzten Eintrags im Monat |
+| Stundenzettel, „Unterschrift des Arbeitnehmers“ | Mitarbeiter | letzter Tag des Monats |
+| Stundenzettel, „Unterschrift des Arbeitgebers“ | Chef | letzter Tag des Monats |
 | Einsatzliste, jede Tageszelle | Mitarbeiter (neben den Stunden) | – |
-| Einsatzliste, unten | Chef | Tag des letzten Eintrags aller Mitarbeiter |
+| Einsatzliste, unten | Chef | letzter Tag des Monats |
 
 Mitarbeiter sehen in der Einsatzliste die Stunden der Kollegen (wie auf dem Papier), statt fremder
 Unterschriften aber nur ein ✓. Der Chef und das PDF zeigen alle Unterschriften.
