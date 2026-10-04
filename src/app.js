@@ -1,3 +1,5 @@
+import crypto from 'node:crypto';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
@@ -13,9 +15,18 @@ import {
 import adminRoutes from './routes/admin.js';
 import authRoutes from './routes/auth.js';
 import heftRoutes from './routes/heft.js';
+import ownerRoutes from './routes/owner.js';
 import settingsRoutes from './routes/settings.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+
+// Versionskennung für Stil und Skripte: ändert sich mit jedem Update, damit Handys nie eine alte Fassung
+// aus dem Zwischenspeicher nehmen.
+const ASSET_VERSION = (() => {
+  const hash = crypto.createHash('sha256');
+  for (const file of ['css/app.css', 'js/app.js', 'js/theme.js', 'js/time-input.js']) hash.update(fs.readFileSync(path.join(ROOT, 'public', file)));
+  return hash.digest('hex').slice(0, 10);
+})();
 
 // Hilfsfunktionen für die Papieransicht: Punkte (pt) werden über --pt in Bildschirmgröße umgerechnet.
 const pt = (n) => `calc(var(--pt) * ${Number(n.toFixed(3))})`;
@@ -33,6 +44,7 @@ export function createApp({ config, db = new LazyDatabase(config) }) {
     CODES, DATEV, ROSTER, WEEKDAYS_SHORT,
     formatDateDE, formatDuration, formatDecimalHours, monthKey, monthLabel, shiftMonth,
     pt,
+    asset: (file) => `/static/${file}?v=${ASSET_VERSION}`,
     at: (x, y) => `left:${pt(x)};top:${pt(y)}`,
     rect: ({ x, y, w, h }) => `left:${pt(x)};top:${pt(y)};width:${pt(w)};height:${pt(h)}`,
     json: (value) => JSON.stringify(value).replace(/</g, '\\u003c'),
@@ -46,7 +58,11 @@ export function createApp({ config, db = new LazyDatabase(config) }) {
     });
     next();
   });
-  app.use('/static', express.static(path.join(ROOT, 'public'), { maxAge: '1d' }));
+  app.use('/static', express.static(path.join(ROOT, 'public'), {
+    maxAge: '1d',
+    // Auch Modulimporte wie time-input.js nach einem Update neu validieren.
+    setHeaders: (res, file) => { if (file.endsWith('.js')) res.set('Cache-Control', 'public, max-age=0, must-revalidate'); },
+  }));
   app.use('/fonts', express.static(path.join(ROOT, 'assets', 'fonts'), { maxAge: '30d' }));
   app.get('/healthz', (req, res) => res.type('text').send('ok'));
 
@@ -81,6 +97,7 @@ export function createApp({ config, db = new LazyDatabase(config) }) {
   app.use(authRoutes(ctx));
   app.use(settingsRoutes(ctx));
   app.use(heftRoutes(ctx));
+  app.use(ownerRoutes(ctx));
   app.use('/admin', adminRoutes(ctx));
 
   // Unterschriften als Bild: eigene, die des Arbeitgebers – der Chef darf alle sehen.

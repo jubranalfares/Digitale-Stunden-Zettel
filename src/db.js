@@ -60,14 +60,29 @@ const MIGRATIONS = [
   );
 
   `,
-  `
-  ALTER TABLE entries ADD COLUMN employer_signature_id INTEGER;
-  UPDATE entries SET employer_signature_id = (
-    SELECT id FROM signatures WHERE kind = 'employer' AND created_at <= entries.created_at
-    ORDER BY created_at DESC, id DESC LIMIT 1
-  );
-  `,
+  ensureOwnerColumn,
+  async (db) => {
+    // Beide zwischenzeitlich ausgelieferten Version-2-Stände unterstützen:
+    // Hauptbranch mit Inhaberrecht und Formularbranch mit Signaturversionen.
+    await ensureOwnerColumn(db);
+    const columns = await db.all('PRAGMA table_info(entries)');
+    if (!columns.some((c) => c.name === 'employer_signature_id')) {
+      await db.run('ALTER TABLE entries ADD COLUMN employer_signature_id INTEGER');
+      await db.run(`UPDATE entries SET employer_signature_id = (
+        SELECT id FROM signatures WHERE kind = 'employer' AND created_at <= entries.created_at
+        ORDER BY created_at DESC, id DESC LIMIT 1
+      )`);
+    }
+  },
 ];
+
+async function ensureOwnerColumn(db) {
+  const columns = await db.all('PRAGMA table_info(users)');
+  if (!columns.some((c) => c.name === 'is_owner')) {
+    await db.run('ALTER TABLE users ADD COLUMN is_owner INTEGER NOT NULL DEFAULT 0');
+    await db.run("UPDATE users SET is_owner = 1 WHERE id = (SELECT MIN(id) FROM users WHERE role = 'admin')");
+  }
+}
 
 export const isLocalUrl = (url) => url === ':memory:' || url.startsWith('file:');
 
@@ -157,11 +172,14 @@ export class Database {
       const row = await db.get('SELECT version FROM schema_version');
       const current = row ? Number(row.version) : 0;
       for (let v = current; v < MIGRATIONS.length; v++) {
-        // "IF NOT EXISTS", damit zwei gleichzeitig startende Server (z. B. auf Vercel) sich nicht stören.
-        const statements = MIGRATIONS[v].split(/;\s*\n/)
-          .map((s) => s.replace(/--.*$/gm, '').trim()).filter(Boolean)
-          .map((s) => s.replace(/^CREATE (TABLE|INDEX) (?!IF NOT EXISTS)/, 'CREATE $1 IF NOT EXISTS '));
-        for (const sql of statements) await db.run(sql);
+        const migration = MIGRATIONS[v];
+        if (typeof migration === 'function') await migration(db);
+        else {
+          const statements = migration.split(/;\s*\n/)
+            .map((s) => s.replace(/--.*$/gm, '').trim()).filter(Boolean)
+            .map((s) => s.replace(/^CREATE (TABLE|INDEX) (?!IF NOT EXISTS)/, 'CREATE $1 IF NOT EXISTS '));
+          for (const sql of statements) await db.run(sql);
+        }
         await db.run('DELETE FROM schema_version');
         await db.run('INSERT INTO schema_version (version) VALUES (?)', [v + 1]);
       }

@@ -63,6 +63,8 @@ Unterschriften werden als PNG versioniert gespeichert. Jeder neue Tageseintrag v
 
 Unter **Einstellungen** können alle ihre Unterschrift neu zeichnen und ihr Passwort ändern. Der Chef kann außerdem Firmenname, Titel der Einsatzliste und Logo ändern. Das Feld „Pers.-Nr.“ bleibt ausschließlich als leeres Druckfeld in der Vorlage bestehen.
 
+Die zwischenzeitlich im Hauptbranch ergänzte Inhaber-Verwaltung und der Hell-/Dunkel-Modus bleiben erhalten. Der erste Chef ist zugleich Inhaber und kann weitere Chef-Zugänge verwalten. Mitarbeiter werden auch dort ausschließlich deaktiviert. Die Papierformulare bleiben in beiden Darstellungen weiß.
+
 ## PDF für den Steuerberater
 
 Ein Knopf erzeugt eine gemeinsame PDF:

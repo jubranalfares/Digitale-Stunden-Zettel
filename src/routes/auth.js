@@ -39,6 +39,7 @@ export default function authRoutes({ store, config }) {
 
     const id = await store.createInitialAdmin(values.company, {
       username: values.username, passwordHash: await hashPassword(password), role: 'admin', name: values.name,
+      onRoster: false, isOwner: true,
     });
     if (!id) return res.status(409).render('error', { title: 'Bereits eingerichtet', message: 'Der Betrieb wurde bereits eingerichtet. Bitte anmelden.' });
     await startSession(req, res, store, config, id);
@@ -83,9 +84,12 @@ export default function authRoutes({ store, config }) {
 
   // ---- Erste Anmeldung: eigenes Passwort + Unterschrift ---------------------
 
+  // Ein neuer Chef unterschreibt hier gleich als Arbeitgeber, solange noch keine Arbeitgeber-Unterschrift existiert.
+  const asksEmployerSignature = (req, res) => req.user.role === 'admin' && !res.locals.settings.employer_signature_id;
+
   router.get('/willkommen', requireLogin, (req, res) => {
     if (!req.user.must_change_password) return res.redirect('/');
-    res.render('welcome', { title: 'Willkommen', error: null });
+    res.render('welcome', { title: 'Willkommen', error: null, employerSignature: asksEmployerSignature(req, res) });
   });
 
   router.post('/willkommen', requireLogin, async (req, res) => {
@@ -97,18 +101,22 @@ export default function authRoutes({ store, config }) {
     if (password !== String(req.body.passwort2 ?? '')) error = 'Die Passwörter stimmen nicht überein.';
     else error = passwordProblem(password);
     if (!error && isEmployee && !signature) error = 'Bitte unterschreiben Sie im Feld „Unterschrift“.';
-    if (error) return res.status(400).render('welcome', { title: 'Willkommen', error });
+    const employerSignature = asksEmployerSignature(req, res);
+    if (error) return res.status(400).render('welcome', { title: 'Willkommen', error, employerSignature });
 
     if (await verifyPassword(password, req.user.password_hash)) {
-      return res.status(400).render('welcome', { title: 'Willkommen', error: 'Bitte ein anderes Passwort als das Startpasswort wählen.' });
+      return res.status(400).render('welcome', { title: 'Willkommen', error: 'Bitte ein anderes Passwort als das Startpasswort wählen.', employerSignature });
     }
     const passwordHash = await hashPassword(password);
     await store.atomic(async (tx) => {
-      if (signature) await tx.setUserSignature(req.user.id, signature);
+      if (signature && isEmployee) await tx.setUserSignature(req.user.id, signature);
+      if (signature && employerSignature) await tx.setEmployerSignature(req.user.id, signature);
       await tx.updateUser(req.user.id, { password_hash: passwordHash, must_change_password: 0 });
     });
     await store.deleteUserSessions(req.user.id, req.session.id_hash);
-    await req.flash('success', 'Alles eingerichtet! Ihre Unterschrift wird ab jetzt automatisch bei jedem Eintrag gesetzt.');
+    await req.flash('success', isEmployee || signature
+      ? 'Alles eingerichtet! Ihre Unterschrift wird ab jetzt automatisch gesetzt.'
+      : 'Alles eingerichtet!');
     res.redirect('/');
   });
 

@@ -55,11 +55,11 @@ export class Store {
     return Number((await this.db.get('SELECT COUNT(*) AS n FROM users')).n);
   }
 
-  async createUser({ username, passwordHash, role, name, onRoster = true, mustChangePassword = false }) {
+  async createUser({ username, passwordHash, role, name, onRoster = true, mustChangePassword = false, isOwner = false }) {
     const { lastId } = await this.db.run(`
-      INSERT INTO users (username, password_hash, role, name, on_roster, must_change_password)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `, [username, passwordHash, role, name, onRoster ? 1 : 0, mustChangePassword ? 1 : 0]);
+      INSERT INTO users (username, password_hash, role, name, on_roster, must_change_password, is_owner)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [username, passwordHash, role, name, onRoster ? 1 : 0, mustChangePassword ? 1 : 0, isOwner ? 1 : 0]);
     return lastId;
   }
 
@@ -81,16 +81,40 @@ export class Store {
   }
 
   async updateUser(id, fields) {
-    const allowed = ['username', 'name', 'on_roster', 'active', 'password_hash', 'must_change_password', 'signature_id'];
+    const allowed = ['username', 'name', 'on_roster', 'active', 'password_hash', 'must_change_password', 'signature_id', 'role', 'is_owner'];
     const keys = Object.keys(fields).filter((k) => allowed.includes(k));
     if (!keys.length) return;
     const args = Object.fromEntries(keys.map((k) => [k, fields[k]]));
     await this.db.run(`UPDATE users SET ${keys.map((k) => `${k} = @${k}`).join(', ')} WHERE id = @id`, { ...args, id });
   }
 
+  // Einen Zugang vollständig entfernen – nur ohne eigene Zeiteinträge (sonst deaktivieren).
+  // Nur für Zugänge ohne eigene Daten (siehe userHasRecords); Arbeitgeber-Unterschriften bleiben ohnehin erhalten.
+  async deleteUser(id) {
+    await this.db.batch([
+      ["DELETE FROM signatures WHERE user_id = ? AND kind = 'employee'", [id]],
+      ['DELETE FROM sessions WHERE user_id = ?', [id]],
+      ['DELETE FROM users WHERE id = ?', [id]],
+    ]);
+  }
+
+  // Hat der Zugang Spuren in den Stundenzetteln hinterlassen (eigene oder für andere erfasste Einträge,
+  // Arbeitgeber-Unterschrift)? Dann darf er wegen der Aufbewahrungspflicht nur deaktiviert werden.
+  async userHasRecords(id) {
+    const row = await this.db.get(`
+      SELECT EXISTS (SELECT 1 FROM entries WHERE user_id = ? OR recorded_by = ?)
+          OR EXISTS (SELECT 1 FROM signatures WHERE user_id = ? AND kind = 'employer') AS used
+    `, [id, id, id]);
+    return Boolean(Number(row.used));
+  }
+
+  countActiveOwners() {
+    return this.db.get('SELECT COUNT(*) AS n FROM users WHERE is_owner = 1 AND active = 1').then((r) => Number(r.n));
+  }
+
   listUsers() {
     return this.db.all(`
-      SELECT * FROM users ORDER BY role = 'admin' DESC, active DESC, name COLLATE NOCASE
+      SELECT * FROM users ORDER BY is_owner DESC, role = 'admin' DESC, active DESC, name COLLATE NOCASE
     `);
   }
 

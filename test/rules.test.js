@@ -157,7 +157,7 @@ test('Parallele Kaltstarts und Ersteinrichtungen legen genau einen Chef an', asy
   })));
   assert.equal(ids.filter((id) => id !== null).length, 1);
   assert.equal(await stores[0].countUsers(), 1);
-  assert.equal(Number((await dbs[0].get('SELECT version FROM schema_version')).version), 2);
+  assert.equal(Number((await dbs[0].get('SELECT version FROM schema_version')).version), 3);
 });
 
 test('SQL-Sicherung lässt sich vollständig in eine neue Datenbank zurückspielen', async (t) => {

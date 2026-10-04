@@ -3,9 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#16302f">
+  <meta name="theme-color" content="#16302f" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0b1211" media="(prefers-color-scheme: dark)">
   <title><%= title ? `${title} · ` : '' %>Stundenzettel<%= settings.company_name ? ` · ${settings.company_name}` : '' %></title>
-  <link rel="stylesheet" href="/static/css/app.css">
+  <script src="<%= asset('js/theme.js') %>"></script>
+  <link rel="stylesheet" href="<%= asset('css/app.css') %>">
   <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
   <link rel="manifest" href="/static/manifest.webmanifest">
 </head>
@@ -23,13 +25,19 @@
     <% if (user.role === 'admin') { %>
       <a href="/admin/mitarbeiter" class="<%= navActive('/admin/mitarbeiter') %>">Mitarbeiter</a>
     <% } %>
+    <% if (locals.isOwner) { %>
+      <a href="/inhaber" class="<%= navActive('/inhaber') %>">Inhaber</a>
+    <% } %>
     <a href="/einstellungen" class="<%= navActive('/einstellungen') %>">Einstellungen</a>
+    <button type="button" class="theme-toggle" data-theme-toggle aria-label="Hell/Dunkel umschalten" title="Hell/Dunkel umschalten"><span aria-hidden="true" data-theme-icon>◐</span></button>
     <form method="post" action="/logout">
       <input type="hidden" name="_csrf" value="<%= csrfToken %>">
       <button type="submit">Abmelden</button>
     </form>
   </nav>
 </header>
+<% } else { %>
+<button type="button" class="theme-toggle theme-toggle-floating" data-theme-toggle aria-label="Hell/Dunkel umschalten" title="Hell/Dunkel umschalten"><span aria-hidden="true" data-theme-icon>◐</span></button>
 <% } %>
 <main class="<%= locals.bare ? '' : 'container' %>">
 <% if (flash && !locals.bare) { %>

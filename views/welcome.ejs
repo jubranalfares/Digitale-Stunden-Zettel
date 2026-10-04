@@ -23,6 +23,11 @@
           <label style="margin-bottom:6px">Ihre Unterschrift</label>
           <%- include('partials/signature-pad', { required: true }) %>
         </div>
+      <% } else if (locals.employerSignature) { %>
+        <div>
+          <label style="margin-bottom:6px">Unterschrift des Arbeitgebers <span class="hint">(einmalig – erscheint automatisch auf allen Stundenzetteln und der Einsatzliste; kann auch später unter Einstellungen erfolgen)</span></label>
+          <%- include('partials/signature-pad', { required: false }) %>
+        </div>
       <% } %>
       <button class="btn btn-primary btn-block" type="submit">Speichern und loslegen</button>
     </form>

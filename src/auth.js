@@ -108,6 +108,7 @@ export function sessionMiddleware(store, config) {
     };
 
     res.locals.user = req.user;
+    res.locals.isOwner = isOwner(req.user);
     res.locals.csrfToken = req.session?.csrf_token ?? '';
     next();
   };
@@ -127,7 +128,7 @@ export function requireLogin(req, res, next) {
     ? res.status(401).json({ error: 'Bitte erneut anmelden.' }) : res.redirect('/login');
   if (req.user.must_change_password && !req.path.startsWith('/willkommen')) return res.redirect('/willkommen');
   if (req.user.role === 'admin' && !res.locals.settings.employer_signature_id
-      && !req.path.startsWith('/einstellungen')) return res.redirect('/einstellungen?willkommen=1#unterschrift');
+      && !req.path.startsWith('/einstellungen') && !req.path.startsWith('/willkommen')) return res.redirect('/einstellungen?willkommen=1#unterschrift');
   next();
 }
 
@@ -139,7 +140,19 @@ export function requireAdmin(req, res, next) {
 }
 
 export function requireEmployee(req, res, next) {
-  if (req.user?.role !== 'employee') return res.redirect('/admin');
+  if (req.user?.role !== 'employee') return res.redirect('/einsatzliste');
+  next();
+}
+
+// Inhaber-Bereich: nur für den Betreiber (den ersten angelegten Zugang bzw. von einem Inhaber ernannt).
+// Für alle anderen existiert der Bereich schlicht nicht (404), statt eines sichtbaren „kein Zugriff“.
+// Inhaber sind immer auch Chefs; das Recht gilt nur zusammen mit der Chef-Rolle.
+export const isOwner = (user) => Boolean(user?.is_owner) && user.role === 'admin';
+
+export function requireOwner(req, res, next) {
+  if (!isOwner(req.user)) {
+    return res.status(404).render('error', { title: 'Nicht gefunden', message: 'Diese Seite gibt es nicht.' });
+  }
   next();
 }
 
