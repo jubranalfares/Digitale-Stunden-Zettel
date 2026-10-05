@@ -386,15 +386,21 @@ input[type="checkbox"] { display: inline-block; width: 20px; min-height: 20px; h
 
 /* ---- Eingabefenster -------------------------------------------------------- */
 
+/* Das <dialog> füllt den sichtbaren Bereich (bei offener Tastatur nur den Teil darüber);
+   die Karte darin sitzt immer mittig. --vv-top/--vv-height setzt public/js/app.js. */
 .entry-dialog {
-  width: 100%; max-width: 460px; max-height: min(94vh, 760px); padding: 0; border: 0; border-radius: 20px;
-  background: var(--surface); color: var(--text); box-shadow: 0 24px 70px rgba(0, 0, 0, .35); overflow: hidden;
+  position: fixed; top: var(--vv-top, 0px); left: 0; right: 0; bottom: auto;
+  width: 100%; height: var(--vv-height, 100dvh); max-width: none; max-height: none; margin: 0; padding: 12px;
+  border: 0; background: transparent; color: var(--text); overflow: hidden;
 }
 .entry-dialog::backdrop { background: rgba(10, 20, 19, .5); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px); }
-.entry-dialog[open] { display: flex; animation: sheet-in .22s ease-out; }
-@keyframes sheet-in { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
-.entry-form { display: flex; flex-direction: column; width: 100%; max-height: inherit; }
-.sheet-grip { display: none; }
+.entry-dialog[open] { display: flex; align-items: center; justify-content: center; }
+.entry-form {
+  display: flex; flex-direction: column; width: 100%; max-width: 460px; max-height: 100%;
+  background: var(--surface); border-radius: 20px; box-shadow: 0 24px 70px rgba(0, 0, 0, .35); overflow: hidden;
+  animation: card-in .22s ease-out;
+}
+@keyframes card-in { from { transform: translateY(14px) scale(.98); opacity: 0; } to { transform: none; opacity: 1; } }
 .entry-head { display: flex; align-items: flex-start; gap: 12px; padding: 18px 20px 8px; }
 .entry-head h2 { margin: 0; font-size: 1.15rem; outline: none; }
 .entry-name { color: var(--muted); font-size: .9rem; }
@@ -446,15 +452,7 @@ input[type="checkbox"] { display: inline-block; width: 20px; min-height: 20px; h
 .pdf-dialog .entry-actions .btn { flex: 1; }
 
 @media (max-width: 640px) {
-  /* Auf dem Handy oben als Karte, damit die Tastatur nichts verdeckt */
-  .entry-dialog {
-    width: calc(100% - 16px); max-width: none; margin: max(10px, env(safe-area-inset-top)) auto auto;
-    max-height: calc(100dvh - 20px); border-radius: 20px;
-  }
-  .entry-dialog[open] { animation-name: card-in; }
-  .pdf-dialog { margin: auto 0 0; width: 100%; border-radius: 22px 22px 0 0; }
-  .pdf-dialog .sheet-grip { display: block; width: 40px; height: 5px; border-radius: 3px; background: var(--border); margin: 8px auto 0; }
-  .pdf-dialog .entry-foot { padding-bottom: max(18px, env(safe-area-inset-bottom)); }
+  .entry-dialog { padding: 8px; }
   .entry-head { padding: 14px 16px 6px; }
   .entry-body { padding: 6px 16px 4px; }
   .entry-foot { padding: 12px 16px 14px; }
@@ -462,7 +460,6 @@ input[type="checkbox"] { display: inline-block; width: 20px; min-height: 20px; h
   .time-in { width: 50px; height: 52px; font-size: 1.7rem; }
   .time-colon { line-height: 52px; font-size: 1.5rem; }
 }
-@keyframes card-in { from { transform: translateY(-16px); opacity: 0; } to { transform: none; opacity: 1; } }
 
 .toast {
   position: fixed; left: 50%; bottom: 20px; transform: translate(-50%, 140%); z-index: 50;
@@ -513,4 +510,49 @@ code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; font-
   body { background: #fff; }
   .container { padding: 0; max-width: none; }
   .paper { box-shadow: none; }
+}
+
+/* ---- Startbildschirm in der App (beim Öffnen vom Home-Bildschirm) -------------- */
+
+.launch { display: none; }
+.launching .launch {
+  display: grid; place-items: center; position: fixed; inset: 0; z-index: 1000; color: #fff; text-align: center;
+  background: radial-gradient(120% 80% at 50% 20%, #1f8f88 0%, #0d5e60 45%, #072f31 100%); background-color: #0a3f41;
+  transition: opacity .4s ease, transform .4s ease;
+}
+.launching { overflow: hidden; }
+.launch-done .launch { opacity: 0; transform: scale(1.04); }
+.launch-logo { position: relative; width: 128px; height: 128px; margin: 0 auto 26px; }
+.launch-logo svg { position: relative; width: 128px; height: 128px; filter: drop-shadow(0 14px 30px rgba(0, 0, 0, .35)); }
+.launch-ring {
+  position: absolute; inset: -18px; border-radius: 42px; border: 2px solid rgba(255, 255, 255, .35); opacity: 0;
+  animation: l-ring 2.2s cubic-bezier(.2, .7, .3, 1) .9s infinite;
+}
+.launch-ring.two { animation-delay: 2s; }
+.launch .l-tile { transform-origin: 32px 32px; animation: l-pop .7s cubic-bezier(.34, 1.56, .64, 1) both; }
+.launch .l-sheet { animation: l-sheet .6s cubic-bezier(.2, .8, .2, 1) .25s both; }
+.launch .l-line { stroke-dasharray: 20; stroke-dashoffset: 20; animation: l-write .45s ease-out forwards; }
+.launch .l1 { animation-delay: .7s; }
+.launch .l2 { animation-delay: .85s; }
+.launch .l3 { stroke-dasharray: 12; stroke-dashoffset: 12; animation-delay: 1s; }
+.launch .l-clock { transform-origin: 44px 45px; animation: l-pop .55s cubic-bezier(.34, 1.56, .64, 1) 1.05s both; }
+.launch .l-hand-m { transform-origin: 44px 45px; animation: l-spin 1.6s linear 1.2s infinite; }
+.launch .l-hand-h { transform-origin: 44px 45px; animation: l-spin 9.6s linear 1.2s infinite; }
+.launch-title { font-size: 2rem; font-weight: 700; animation: l-rise .6s ease-out .45s both; }
+.launch-sub { margin: 4px 0 28px; opacity: .85; animation: l-rise .6s ease-out .6s both; }
+.launch-bar { position: relative; width: 180px; height: 5px; margin: 0 auto; border-radius: 99px; background: rgba(255, 255, 255, .18); overflow: hidden; }
+.launch-bar span {
+  position: absolute; top: 0; bottom: 0; width: 40%; border-radius: inherit;
+  background: linear-gradient(90deg, transparent, #fff, transparent); animation: l-slide 1.2s ease-in-out infinite;
+}
+@keyframes l-ring { 0% { transform: scale(.85); opacity: .6; } 100% { transform: scale(1.35); opacity: 0; } }
+@keyframes l-pop { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes l-sheet { from { transform: translateY(18px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes l-write { to { stroke-dashoffset: 0; } }
+@keyframes l-spin { to { transform: rotate(360deg); } }
+@keyframes l-rise { from { transform: translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes l-slide { from { left: -40%; } to { left: 100%; } }
+@media (prefers-reduced-motion: reduce) {
+  .launch *, .launch *::before { animation-duration: .01ms !important; animation-iteration-count: 1 !important; animation-delay: 0s !important; }
+  .launch .l-line { stroke-dashoffset: 0; }
 }

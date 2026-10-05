@@ -4,6 +4,8 @@
   const MIN_SHOW = 1500;
   const MAX_WAIT = 10000;
   const started = Date.now();
+  // Die App soll den Startbildschirm danach nicht noch einmal zeigen.
+  try { sessionStorage.setItem('launched', '1'); } catch { /* egal */ }
   const warmUp = fetch('/healthz', { cache: 'no-store' })
     .then(() => fetch('/', { credentials: 'same-origin', redirect: 'manual', cache: 'no-store' }))
     .catch(() => {});

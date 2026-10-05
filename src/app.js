@@ -24,7 +24,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // aus dem Zwischenspeicher nehmen.
 const ASSET_VERSION = (() => {
   const hash = crypto.createHash('sha256');
-  for (const file of ['css/app.css', 'js/app.js', 'js/theme.js']) hash.update(fs.readFileSync(path.join(ROOT, 'public', file)));
+  for (const file of ['css/app.css', 'js/app.js', 'js/theme.js', 'manifest.webmanifest']) hash.update(fs.readFileSync(path.join(ROOT, 'public', file)));
   return hash.digest('hex').slice(0, 10);
 })();
 

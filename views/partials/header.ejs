@@ -11,9 +11,10 @@
   <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
   <meta name="apple-mobile-web-app-title" content="Stundenzettel">
-  <link rel="manifest" href="/static/manifest.webmanifest">
+  <link rel="manifest" href="<%= asset('manifest.webmanifest') %>">
 </head>
 <body>
+<%- include('launch') %>
 <% if (user && !locals.bare) {
   const navActive = (href) => currentPath === href || (href !== '/admin' && currentPath.startsWith(href + '/')) ? 'active' : '';
 %>

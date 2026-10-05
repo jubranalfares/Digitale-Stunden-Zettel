@@ -4,6 +4,15 @@
 
   const pad = (n) => String(n).padStart(2, '0');
 
+  // ---- Startbildschirm ausblenden (siehe theme.js), mindestens 1,6 Sekunden sichtbar
+  const root = document.documentElement;
+  if (root.classList.contains('launching')) {
+    setTimeout(() => {
+      root.classList.add('launch-done');
+      setTimeout(() => root.classList.remove('launching', 'launch-done'), 450);
+    }, Math.max(0, 1600 - performance.now()));
+  }
+
   // ---- Sicherheitsabfragen --------------------------------------------------
 
   document.addEventListener('click', (e) => {
@@ -236,6 +245,19 @@
       document.querySelectorAll(`[data-sig-date="${key}"]`).forEach((el) => { el.textContent = sig ? sig.date : ''; });
     };
 
+    // Fenster immer mittig im sichtbaren Bereich halten, auch wenn die Tastatur aufgeht.
+    const vv = window.visualViewport;
+    const fitDialogs = () => {
+      if (!vv) return;
+      document.querySelectorAll('dialog.entry-dialog').forEach((d) => {
+        d.style.setProperty('--vv-top', `${Math.round(vv.offsetTop)}px`);
+        d.style.setProperty('--vv-height', `${Math.round(vv.height)}px`);
+      });
+    };
+    vv?.addEventListener('resize', fitDialogs);
+    vv?.addEventListener('scroll', fitDialogs);
+    fitDialogs();
+
     // ---- PDF für den Steuerberater
     // Auf dem Handy öffnet sich das Teilen-Menü (Mail, WhatsApp, Dateien …), am Computer wird es heruntergeladen.
     // Wichtig für die App auf dem Home-Bildschirm: Dort hätte ein einfach geöffnetes PDF keinen Teilen-Knopf.
@@ -282,6 +304,7 @@
         shareBtn.disabled = true;
         shareBtn.hidden = false;
         downloadLink.hidden = true;
+        fitDialogs();
         if (pdfDialog.showModal) pdfDialog.showModal(); else pdfDialog.setAttribute('open', '');
         q('#pdf-title').focus();
         try {
@@ -445,6 +468,7 @@
       $('[data-entry-title]').textContent = dayLabel(d.date);
       $('[data-entry-name]').textContent = d.name || '';
       render();
+      fitDialogs();
       if (dialog.showModal) dialog.showModal(); else dialog.setAttribute('open', '');
       // Leerer Tag: gleich die Stunde des Beginns eintippen (Zahlentastatur geht auf).
       if (!d.start) focusField('start-h');

@@ -4,4 +4,12 @@
     const theme = localStorage.getItem('theme');
     if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
   } catch { /* Speicher gesperrt (z. B. privater Modus): dann gilt die Systemeinstellung. */ }
+  // App vom Home-Bildschirm gestartet: einmal pro Start den animierten Startbildschirm zeigen.
+  try {
+    const standalone = navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+    if (standalone && !sessionStorage.getItem('launched')) {
+      document.documentElement.classList.add('launching');
+      sessionStorage.setItem('launched', '1');
+    }
+  } catch { /* ohne Speicher kein Startbildschirm */ }
 })();
