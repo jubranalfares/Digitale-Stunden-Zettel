@@ -3,10 +3,13 @@
 import express from 'express';
 import { requireAdmin, requireLogin } from '../auth.js';
 import { canEdit, earliestEditableDate, saveEntry } from '../entries.js';
-import { currentMonthOf, sendPdf } from '../http.js';
+import { asciiFileName, currentMonthOf, sendPdf } from '../http.js';
 import { createPdf, drawEmployeeSheet, drawRoster, pdfToBuffer } from '../pdf.js';
 import { buildEmployeeSheet, buildRoster, rosterCell, rosterEmployerSignature } from '../sheets.js';
 import { InputError, isValidISODate, monthKey, monthLabel, monthOf, parseMonth } from '../time.js';
+
+// "Stundenzettel_Oktober_2026.pdf"
+const pdfFileName = (ym) => `${asciiFileName(`Stundenzettel ${monthLabel(ym)}`)}.pdf`;
 
 export default function heftRoutes({ store }) {
   const router = express.Router();
@@ -44,6 +47,7 @@ export default function heftRoutes({ store }) {
       minDate: earliestEditableDate(req.user, req.today),
       editable: (date) => !!date && canEdit(req.user, date, req.today),
       employerSignatureMissing: isAdmin && !res.locals.settings.employer_signature_id,
+      pdfFileName: pdfFileName(ym),
       ...rest,
     });
   }
@@ -141,7 +145,7 @@ export default function heftRoutes({ store }) {
     for (const u of await store.employeesForMonth(monthKey(ym))) {
       if (u.entry_count > 0) drawEmployeeSheet(doc, await buildEmployeeSheet(store, u, ym));
     }
-    sendPdf(res, await pdfToBuffer(doc), `Stundenzettel_${monthKey(ym)}.pdf`);
+    sendPdf(res, await pdfToBuffer(doc), pdfFileName(ym));
   });
 
   return router;

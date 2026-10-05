@@ -256,6 +256,11 @@ test('Ein PDF für den Steuerberater', async () => {
   const pdf = await chef.get('/pdf');
   assert.equal(pdf.type, 'application/pdf');
   assert.equal(pdf.data.subarray(0, 4).toString(), '%PDF');
+  const res = await fetch(`${base}/pdf?monat=2026-03`, { headers: { cookie: chef.cookie } });
+  assert.match(res.headers.get('content-disposition'), /filename="Stundenzettel_Maerz_2026\.pdf"/);
+  const page = await chef.get('/einsatzliste');
+  assert.match(page.data, /data-pdf-file="Stundenzettel_[A-Za-z]+_\d{4}\.pdf"/);
+  assert.match(page.data, /data-pdf-dialog/);
 });
 
 test('Datensicherung', async () => {

@@ -3,7 +3,8 @@
   <div class="heft-top">
     <%- include('partials/month-nav', { navBase, ym, isCurrentMonth }) %>
     <% if (isAdmin) { %>
-      <a class="btn btn-primary" href="/pdf?monat=<%= monthKey(ym) %>" target="_blank" rel="noopener">PDF für Steuerberater</a>
+      <a class="btn btn-primary" href="/pdf?monat=<%= monthKey(ym) %>" target="_blank" rel="noopener"
+         data-pdf data-pdf-file="<%= pdfFileName %>" data-pdf-title="Stundenzettel <%= monthLabel(ym) %>">PDF für Steuerberater</a>
     <% } %>
   </div>
 
@@ -44,5 +45,6 @@
   <% } %>
 </div>
 <%- include('partials/entry-dialog') %>
+<% if (isAdmin) { %><%- include('partials/pdf-dialog') %><% } %>
 <div class="toast" data-toast role="status" aria-live="polite"></div>
 <%- include('partials/footer') %>

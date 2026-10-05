@@ -240,6 +240,85 @@
       document.querySelectorAll(`[data-sig-date="${key}"]`).forEach((el) => { el.textContent = sig ? sig.date : ''; });
     };
 
+    // ---- PDF für den Steuerberater
+    // Auf dem Handy öffnet sich das Teilen-Menü (Mail, WhatsApp, Dateien …), am Computer wird es heruntergeladen.
+    // Wichtig für die App auf dem Home-Bildschirm: Dort hätte ein einfach geöffnetes PDF keinen Teilen-Knopf.
+    const pdfLink = document.querySelector('[data-pdf]');
+    const pdfDialog = document.querySelector('[data-pdf-dialog]');
+    if (pdfLink && pdfDialog) {
+      const q = (sel) => pdfDialog.querySelector(sel);
+      const status = q('[data-pdf-status]');
+      const shareBtn = q('[data-pdf-share]');
+      const downloadLink = q('[data-pdf-download]');
+      const pdfError = q('[data-pdf-error]');
+      let file = null;
+      let blobUrl = null;
+
+      const closePdf = () => { if (pdfDialog.close) pdfDialog.close(); else pdfDialog.removeAttribute('open'); };
+      const showPdfError = (message) => {
+        pdfError.textContent = message;
+        pdfError.hidden = false;
+        status.textContent = '';
+      };
+
+      const share = async () => {
+        try {
+          await navigator.share({ files: [file], title: pdfLink.dataset.pdfTitle });
+          closePdf();
+          toast('Erledigt.');
+        } catch (err) {
+          // Abgebrochen: Fenster bleibt offen. Nicht erlaubt (z. B. weil das Erstellen zu lange dauerte):
+          // dann einfach noch einmal auf den Knopf tippen.
+          if (err.name === 'AbortError') return;
+          if (err.name === 'NotAllowedError') {
+            status.textContent = 'Fertig. Tippen Sie auf „Senden oder sichern“.';
+            return;
+          }
+          showPdfError('Teilen hat nicht geklappt. Laden Sie das PDF stattdessen herunter.');
+          downloadLink.hidden = false;
+        }
+      };
+
+      pdfLink.addEventListener('click', async (e) => {
+        e.preventDefault();
+        status.textContent = 'Wird erstellt …';
+        pdfError.hidden = true;
+        shareBtn.disabled = true;
+        shareBtn.hidden = false;
+        downloadLink.hidden = true;
+        if (pdfDialog.showModal) pdfDialog.showModal(); else pdfDialog.setAttribute('open', '');
+        q('#pdf-title').focus();
+        try {
+          const res = await fetch(pdfLink.href, { headers: { Accept: 'application/pdf' } });
+          if (!res.ok || !(res.headers.get('content-type') || '').includes('pdf')) throw new Error();
+          const blob = await res.blob();
+          file = new File([blob], pdfLink.dataset.pdfFile, { type: 'application/pdf' });
+          if (blobUrl) URL.revokeObjectURL(blobUrl);
+          blobUrl = URL.createObjectURL(blob);
+          downloadLink.href = blobUrl;
+          downloadLink.download = pdfLink.dataset.pdfFile;
+        } catch {
+          showPdfError('Das PDF konnte nicht erstellt werden. Bitte versuchen Sie es noch einmal.');
+          return;
+        }
+        const size = `${Math.max(1, Math.round(file.size / 1024))} KB`;
+        if (navigator.canShare?.({ files: [file] })) {
+          status.textContent = `Fertig, ${size}.`;
+          shareBtn.disabled = false;
+          await share();
+        } else {
+          // Computer ohne Teilen-Funktion: direkt herunterladen.
+          shareBtn.hidden = true;
+          downloadLink.hidden = false;
+          downloadLink.click();
+          status.textContent = `Fertig, ${size}. Das PDF wurde heruntergeladen.`;
+        }
+      });
+      shareBtn.addEventListener('click', share);
+      q('[data-pdf-close]').addEventListener('click', closePdf);
+      pdfDialog.addEventListener('click', (e) => { if (e.target === pdfDialog) closePdf(); });
+    }
+
     // ---- Eingabefenster
     const $ = (sel) => dialog.querySelector(sel);
     const form = $('[data-entry-form]');
