@@ -1,7 +1,7 @@
 // Startbildschirm: Während die Animation läuft, wird die App schon angefragt. Das weckt den Server auf,
 // damit der eigentliche Wechsel danach schnell geht. Die Animation ist mindestens kurz zu sehen.
 (() => {
-  const MIN_SHOW = 1500;
+  const MIN_SHOW = 2000;
   const MAX_WAIT = 10000;
   const started = Date.now();
   // Die App soll den Startbildschirm danach nicht noch einmal zeigen.

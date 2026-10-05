@@ -4,13 +4,26 @@
 
   const pad = (n) => String(n).padStart(2, '0');
 
-  // ---- Startbildschirm ausblenden (siehe theme.js), mindestens 1,6 Sekunden sichtbar
+  // ---- Startbildschirm (siehe theme.js): mindestens 2 Sekunden sichtbar und bis die Seite ganz
+  // geladen ist. Dann läuft der Ladebalken voll und alles blendet weich aus.
   const root = document.documentElement;
   if (root.classList.contains('launching')) {
-    setTimeout(() => {
-      root.classList.add('launch-done');
-      setTimeout(() => root.classList.remove('launching', 'launch-done'), 450);
-    }, Math.max(0, 1600 - performance.now()));
+    const wait = (ms) => new Promise((resolve) => { setTimeout(resolve, Math.max(0, ms)); });
+    const loaded = new Promise((resolve) => {
+      if (document.readyState === 'complete') resolve();
+      else window.addEventListener('load', resolve, { once: true });
+    });
+    const shownAt = window.launchShownAt ?? 0;
+    Promise.race([Promise.all([loaded, wait(2000 - (performance.now() - shownAt))]), wait(6000)])
+      .then(() => {
+        root.classList.add('launch-ready');
+        return wait(450);
+      })
+      .then(() => {
+        root.classList.add('launch-done');
+        return wait(600);
+      })
+      .then(() => root.classList.remove('launching', 'launch-ready', 'launch-done'));
   }
 
   // ---- Sicherheitsabfragen --------------------------------------------------

@@ -9,6 +9,7 @@
     const standalone = navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
     if (standalone && !sessionStorage.getItem('launched')) {
       document.documentElement.classList.add('launching');
+      window.launchShownAt = performance.now(); // ab hier ist der Startbildschirm zu sehen
       sessionStorage.setItem('launched', '1');
     }
   } catch { /* ohne Speicher kein Startbildschirm */ }

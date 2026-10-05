@@ -518,7 +518,7 @@ code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; font-
 .launching .launch {
   display: grid; place-items: center; position: fixed; inset: 0; z-index: 1000; color: #fff; text-align: center;
   background: radial-gradient(120% 80% at 50% 20%, #1f8f88 0%, #0d5e60 45%, #072f31 100%); background-color: #0a3f41;
-  transition: opacity .4s ease, transform .4s ease;
+  transition: opacity .55s ease, transform .55s ease;
 }
 .launching { overflow: hidden; }
 .launch-done .launch { opacity: 0; transform: scale(1.04); }
@@ -545,6 +545,8 @@ code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; font-
   position: absolute; top: 0; bottom: 0; width: 40%; border-radius: inherit;
   background: linear-gradient(90deg, transparent, #fff, transparent); animation: l-slide 1.2s ease-in-out infinite;
 }
+.launch-ready .launch-bar span { animation: l-fill .45s ease-out forwards; }
+@keyframes l-fill { from { left: 0; width: 0; background: #fff; } to { left: 0; width: 100%; background: #fff; } }
 @keyframes l-ring { 0% { transform: scale(.85); opacity: .6; } 100% { transform: scale(1.35); opacity: 0; } }
 @keyframes l-pop { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 @keyframes l-sheet { from { transform: translateY(18px); opacity: 0; } to { transform: none; opacity: 1; } }
