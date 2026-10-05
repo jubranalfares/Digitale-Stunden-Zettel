@@ -69,6 +69,8 @@ export function createApp({ config, db = new LazyDatabase(config) }) {
     next();
   });
   app.use('/static', express.static(path.join(ROOT, 'public'), { maxAge: '1d' }));
+  // Startbildschirm (start.html) und App-Symbole auch direkt unter / – so wie Vercel sie ausliefert.
+  app.use(express.static(path.join(ROOT, 'public'), { index: false, maxAge: '1h' }));
   app.use('/fonts', express.static(path.join(ROOT, 'assets', 'fonts'), { maxAge: '30d' }));
   app.get('/healthz', (req, res) => res.type('text').send('ok'));
 

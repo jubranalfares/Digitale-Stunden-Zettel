@@ -3,10 +3,6 @@
   'use strict';
 
   const pad = (n) => String(n).padStart(2, '0');
-  const parseClock = (v) => {
-    const m = /^(\d{1,2}):(\d{2})/.exec(v || '');
-    return m ? Number(m[1]) * 60 + Number(m[2]) : null;
-  };
 
   // ---- Sicherheitsabfragen --------------------------------------------------
 
@@ -319,29 +315,35 @@
       pdfDialog.addEventListener('click', (e) => { if (e.target === pdfDialog) closePdf(); });
     }
 
-    // ---- Eingabefenster
+    // ---- Eingabefenster: Uhrzeit direkt eintippen
     const $ = (sel) => dialog.querySelector(sel);
     const form = $('[data-entry-form]');
     const saveBtn = $('[data-entry-save]');
     const deleteBtn = $('[data-entry-delete]');
     const errorEl = $('[data-entry-error]');
-    const minutesRow = $('[data-minutes]');
-    const QUESTIONS = { start: 'Wann ging es los?', end: 'Wann war Schluss?' };
+    const ORDER = ['start-h', 'start-m', 'end-h', 'end-m'];
+    const inputs = Object.fromEntries(ORDER.map((k) => [k, $(`[data-in="${k}"]`)]));
     let target = null; // Zeile bzw. Zelle, die gerade bearbeitet wird
-    let state = null;
+    let exists = false;
     let busy = false;
 
     const timeOf = (t) => (t ? `${pad(t.h)}:${pad(t.m)}` : '');
-    const toTime = (s) => {
-      const min = parseClock(s);
-      return min == null ? null : { h: Math.floor(min / 60), m: min % 60 };
-    };
     const minutesOf = (t) => t.h * 60 + t.m;
+    const isHour = (key) => key.endsWith('-h');
+
+    // Uhrzeit aus den beiden Feldern; ohne Minuten gilt :00. null = leer, false = ungültig.
+    function readTime(field) {
+      const h = inputs[`${field}-h`].value;
+      const m = inputs[`${field}-m`].value;
+      if (h === '' && m === '') return null;
+      if (h === '') return false;
+      const t = { h: Number(h), m: m === '' ? 0 : Number(m) };
+      return t.h <= 23 && t.m <= 59 ? t : false;
+    }
 
     // Arbeitszeit wie auf dem Server: Ende vor Beginn heißt über Mitternacht.
-    function work() {
-      if (!state.start || !state.end) return null;
-      let gross = minutesOf(state.end) - minutesOf(state.start);
+    function work(start, end) {
+      let gross = minutesOf(end) - minutesOf(start);
       if (gross === 0) return { error: 'Beginn und Ende sind gleich.' };
       const overnight = gross < 0;
       if (overnight) gross += 24 * 60;
@@ -350,74 +352,103 @@
     }
 
     function render() {
-      for (const field of ['start', 'end']) {
-        $(`[data-tile-value="${field}"]`).textContent = timeOf(state[field]) || '--:--';
-        $(`[data-tile="${field}"]`).classList.toggle('active', state.field === field);
-        $(`[data-tile="${field}"]`).classList.toggle('filled', !!state[field]);
+      const start = readTime('start');
+      const end = readTime('end');
+      for (const key of ORDER) {
+        const v = inputs[key].value;
+        inputs[key].classList.toggle('bad', v !== '' && Number(v) > (isHour(key) ? 23 : 59));
       }
-
-      $('[data-picker]').hidden = !state.field;
-      if (state.field) {
-        const current = state[state.field];
-        $('[data-picker-head]').textContent = state.minutePending ? 'Und die Minuten?' : QUESTIONS[state.field];
-        minutesRow.classList.toggle('pending', !!state.minutePending);
-        dialog.querySelectorAll('[data-hour]').forEach((b) => {
-          b.classList.toggle('selected', current?.h === Number(b.dataset.hour));
-        });
-        // Alte Einträge mit krummen Minuten (z. B. 12:10) bekommen einen eigenen Knopf.
-        minutesRow.querySelector('[data-extra]')?.remove();
-        if (current && current.m % 15) {
-          const extra = Object.assign(document.createElement('button'), { type: 'button', textContent: `:${pad(current.m)}` });
-          extra.dataset.minute = current.m;
-          extra.dataset.extra = '';
-          minutesRow.append(extra);
-        }
-        minutesRow.querySelectorAll('[data-minute]').forEach((b) => {
-          b.classList.toggle('selected', !!current && !state.minutePending && current.m === Number(b.dataset.minute));
-          b.disabled = !current;
-        });
-      }
-
       const total = $('[data-entry-total]');
-      const w = work();
       total.className = 'entry-total';
       total.replaceChildren();
-      if (w?.error) {
-        total.textContent = w.error;
+      let ok = false;
+      if (start === false || end === false) {
+        total.textContent = 'Die Uhrzeit gibt es nicht. Stunden gehen bis 23, Minuten bis 59.';
         total.classList.add('bad');
-      } else if (w) {
-        total.append(
-          Object.assign(document.createElement('span'), { textContent: 'Arbeitszeit' }),
-          Object.assign(document.createElement('strong'), { textContent: hoursText(w.net) }),
-          Object.assign(document.createElement('small'), { textContent: `${hoursWords(w.net)}${w.overnight ? ', über Mitternacht' : ''}` }),
-        );
-        total.classList.add('good');
+      } else if (start && end) {
+        const w = work(start, end);
+        if (w.error) {
+          total.textContent = w.error;
+          total.classList.add('bad');
+        } else {
+          total.append(
+            Object.assign(document.createElement('span'), { textContent: 'Arbeitszeit' }),
+            Object.assign(document.createElement('strong'), { textContent: hoursText(w.net) }),
+            Object.assign(document.createElement('small'), { textContent: `${hoursWords(w.net)}${w.overnight ? ', über Mitternacht' : ''}` }),
+          );
+          total.classList.add('good');
+          ok = true;
+        }
       } else {
-        total.textContent = state.minutePending ? 'Jetzt die Minuten antippen.'
-          : state.start ? 'Jetzt noch das Ende.' : 'Erst die Stunde, dann die Minuten.';
+        total.textContent = start ? 'Jetzt noch das Ende eintippen.' : 'Tippen Sie die Uhrzeit ein, zum Beispiel 12 und 30.';
       }
-      saveBtn.disabled = !(w && !w.error) || busy;
-      deleteBtn.hidden = !state.exists;
+      saveBtn.disabled = !ok || busy;
+      deleteBtn.hidden = !exists;
+    }
+
+    const focusField = (key) => { inputs[key].focus(); inputs[key].select(); };
+    const next = (key) => ORDER[ORDER.indexOf(key) + 1];
+    const prev = (key) => ORDER[ORDER.indexOf(key) - 1];
+
+    for (const key of ORDER) {
+      const input = inputs[key];
+      // Wer in ein Feld kommt, überschreibt den alten Wert (auch wenn das Handy nichts markiert).
+      input.addEventListener('focus', () => {
+        input.dataset.fresh = '1';
+        input.select();
+      });
+      input.addEventListener('input', (e) => {
+        let digits = input.value.replace(/\D/g, '');
+        if (input.dataset.fresh && e.data != null) digits = String(e.data).replace(/\D/g, '');
+        input.dataset.fresh = '';
+        input.value = digits.slice(0, 2);
+        const v = input.value;
+        // Fertig ist ein Feld nach zwei Ziffern, oder nach einer, wenn keine zweite mehr passt (z. B. 8 Uhr).
+        const done = v.length === 2 || (v.length === 1 && Number(v) > (isHour(key) ? 2 : 5));
+        if (done) {
+          if (v.length === 1) input.value = `0${v}`;
+          if (next(key)) focusField(next(key));
+          else input.blur();
+        }
+        render();
+      });
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace' && input.value === '' && prev(key)) {
+          e.preventDefault();
+          focusField(prev(key));
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          if (!saveBtn.disabled) form.requestSubmit();
+          else if (next(key)) focusField(next(key));
+        }
+      });
+      input.addEventListener('blur', (e) => {
+        if (input.value.length === 1) input.value = `0${input.value}`;
+        // Stunde ohne Minuten: :00 eintragen, damit klar ist, was gespeichert wird.
+        const minute = isHour(key) ? inputs[next(key)] : input;
+        const hour = isHour(key) ? input : inputs[prev(key)];
+        if (hour.value && !minute.value && e.relatedTarget !== minute) minute.value = '00';
+        render();
+      });
     }
 
     function open(el) {
       target = el;
       const d = el.dataset;
-      state = {
-        exists: !!(d.start || d.code || d.remarks),
-        start: toTime(d.start),
-        end: toTime(d.end),
-        field: null,
-        minutePending: false,
-      };
-      // Leerer Tag: gleich mit dem Beginn anfangen. Bestehender Tag: erst einmal nur anzeigen.
-      if (!state.start) state.field = 'start';
+      exists = !!(d.start || d.code || d.remarks);
+      for (const [field, value] of [['start', d.start], ['end', d.end]]) {
+        const [h = '', m = ''] = value ? value.split(':') : [];
+        inputs[`${field}-h`].value = h;
+        inputs[`${field}-m`].value = m;
+      }
       errorEl.hidden = true;
       $('[data-entry-title]').textContent = dayLabel(d.date);
       $('[data-entry-name]').textContent = d.name || '';
       render();
       if (dialog.showModal) dialog.showModal(); else dialog.setAttribute('open', '');
-      $('[data-entry-title]').focus();
+      // Leerer Tag: gleich die Stunde des Beginns eintippen (Zahlentastatur geht auf).
+      if (!d.start) focusField('start-h');
+      else $('[data-entry-title]').focus();
     }
 
     const close = () => {
@@ -427,36 +458,22 @@
     dialog.addEventListener('click', (e) => {
       if (e.target === dialog) return close(); // neben das Fenster getippt
       const btn = e.target.closest('button');
-      if (!btn || !state) return;
-      if (btn.matches('[data-entry-close]')) return close();
-      if (btn.dataset.tile) {
-        state.field = btn.dataset.tile;
-        state.minutePending = false;
-      } else if (btn.dataset.hour) {
-        state[state.field] = { h: Number(btn.dataset.hour), m: state[state.field]?.m ?? 0 };
-        state.minutePending = true;
-      } else if (btn.dataset.minute) {
-        const { field } = state;
-        state.minutePending = false;
-        state[field] = { h: state[field].h, m: Number(btn.dataset.minute) };
-        // Nach dem Beginn geht es mit dem Ende weiter, danach ist die Auswahl fertig.
-        state.field = field === 'start' && !state.end ? 'end' : null;
-      } else if (btn.matches('[data-entry-delete]')) {
-        if (window.confirm(`Eintrag vom ${dayLabel(target.dataset.date)} löschen?`)) {
-          save({ beginn: '', ende: '', pause: '', kuerzel: '', bemerkung: '' });
-        }
-        return;
-      } else {
-        return;
+      if (btn?.matches('[data-entry-close]')) return close();
+      if (btn?.matches('[data-entry-delete]') && window.confirm(`Eintrag vom ${dayLabel(target.dataset.date)} löschen?`)) {
+        save({ beginn: '', ende: '', pause: '', kuerzel: '', bemerkung: '' });
       }
-      render();
+      // Tipp auf ein Zeitfeld-Kästchen (nicht genau ins Feld): das passende Feld wählen.
+      const box = e.target.closest('[data-box]');
+      if (box && !e.target.matches('input')) focusField(`${box.dataset.box}-h`);
     });
 
     form.addEventListener('submit', (e) => {
       e.preventDefault();
+      render();
       if (saveBtn.disabled) return;
+      document.activeElement?.blur();
       // Pause, Kürzel und Bemerkung werden nicht mehr genutzt und beim Speichern geleert.
-      save({ beginn: timeOf(state.start), ende: timeOf(state.end), pause: '', kuerzel: '', bemerkung: '' });
+      save({ beginn: timeOf(readTime('start')), ende: timeOf(readTime('end')), pause: '', kuerzel: '', bemerkung: '' });
     });
 
     // Gespeicherten Tag im Formular anzeigen.

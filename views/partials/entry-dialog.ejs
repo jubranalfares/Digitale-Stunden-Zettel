@@ -1,10 +1,28 @@
 <%#
-  Eingabefenster für einen Tag: Beginn und Ende wählen, speichern.
-  Stunden und Minuten stehen auf einem Bildschirm. Gesteuert von public/js/app.js.
+  Eingabefenster für einen Tag: Beginn und Ende direkt eintippen (Stunde, Minute), speichern.
+  Nach zwei Ziffern springt die Eingabe von selbst ins nächste Feld. Gesteuert von public/js/app.js.
+%>
+<%
+  const timeBox = (field, label) => `
+    <div class="time-box" data-box="${field}">
+      <span class="tile-label">${label}</span>
+      <div class="time-inputs">
+        <label class="time-part">
+          <input class="time-in" data-in="${field}-h" inputmode="numeric" pattern="[0-9]*" placeholder="--"
+                 autocomplete="off" enterkeyhint="next" aria-label="${label} Stunde">
+          <span>Stunde</span>
+        </label>
+        <span class="time-colon" aria-hidden="true">:</span>
+        <label class="time-part">
+          <input class="time-in" data-in="${field}-m" inputmode="numeric" pattern="[0-9]*" placeholder="--"
+                 autocomplete="off" enterkeyhint="next" aria-label="${label} Minute">
+          <span>Minute</span>
+        </label>
+      </div>
+    </div>`;
 %>
 <dialog class="entry-dialog" data-entry-dialog aria-labelledby="entry-title">
   <form method="dialog" class="entry-form" data-entry-form novalidate>
-    <div class="sheet-grip" aria-hidden="true"></div>
     <header class="entry-head">
       <div>
         <h2 id="entry-title" data-entry-title tabindex="-1"></h2>
@@ -15,25 +33,9 @@
 
     <div class="entry-body">
       <div class="time-tiles">
-        <button type="button" class="time-tile" data-tile="start">
-          <span class="tile-label">Beginn</span>
-          <span class="tile-value" data-tile-value="start">--:--</span>
-        </button>
+        <%- timeBox('start', 'Beginn') %>
         <span class="tile-sep" aria-hidden="true">bis</span>
-        <button type="button" class="time-tile" data-tile="end">
-          <span class="tile-label">Ende</span>
-          <span class="tile-value" data-tile-value="end">--:--</span>
-        </button>
-      </div>
-
-      <div class="picker" data-picker>
-        <p class="picker-head" data-picker-head></p>
-        <div class="picker-grid" role="group" aria-label="Stunde">
-          <% for (let h = 0; h < 24; h++) { %><button type="button" data-hour="<%= h %>"><%= h %></button><% } %>
-        </div>
-        <div class="picker-minutes" role="group" aria-label="Minuten" data-minutes>
-          <% [0, 15, 30, 45].forEach((m) => { %><button type="button" data-minute="<%= m %>">:<%= String(m).padStart(2, '0') %></button><% }) %>
-        </div>
+        <%- timeBox('end', 'Ende') %>
       </div>
     </div>
 

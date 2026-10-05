@@ -121,7 +121,8 @@ test('Heft: Tage im Stundenzettel lassen sich antippen', async () => {
   assert.equal(page.status, 200);
   assert.match(page.data, entryAttr(user.id, today));
   assert.match(page.data, /data-entry-dialog/);
-  assert.match(page.data, /data-hour="23"/);
+  assert.match(page.data, /data-in="start-h"/);
+  assert.match(page.data, /data-in="end-m"/);
   assert.match(page.data, /Mein Stundenzettel/);
 });
 
@@ -447,6 +448,15 @@ test('Update-eigene Vercel-Adressen leiten auf die feste Adresse um', async () =
   } finally {
     srv.close();
   }
+});
+
+test('Startbildschirm für die App auf dem Home-Bildschirm', async () => {
+  const page = await fetch(`${base}/start.html`);
+  assert.equal(page.status, 200);
+  assert.match(await page.text(), /Einen Moment, das Heft wird geöffnet/);
+  assert.equal((await fetch(`${base}/js/start.js`)).status, 200);
+  const manifest = await (await fetch(`${base}/static/manifest.webmanifest`)).json();
+  assert.equal(manifest.start_url, '/start.html');
 });
 
 test('Falsches Passwort wird abgelehnt', async () => {

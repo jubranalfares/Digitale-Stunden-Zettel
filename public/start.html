@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0a3f41">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Stundenzettel">
+  <title>Stundenzettel</title>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <noscript><meta http-equiv="refresh" content="0;url=/"></noscript>
+  <!--
+    Startbildschirm der App auf dem Home-Bildschirm. Die Seite ist klein und wird sofort ausgeliefert;
+    währenddessen weckt js/start.js im Hintergrund den Server und wechselt dann in die App.
+  -->
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      display: grid; place-items: center; overflow: hidden; color: #fff;
+      font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: radial-gradient(120% 80% at 50% 20%, #1f8f88 0%, #0d5e60 45%, #072f31 100%);
+      background-color: #0a3f41;
+    }
+    /* langsam wandernde Lichtflecken im Hintergrund */
+    body::before, body::after {
+      content: ""; position: fixed; width: 70vmax; height: 70vmax; border-radius: 50%; filter: blur(60px); opacity: .35;
+      pointer-events: none;
+    }
+    body::before { background: #3fd0c4; top: -30vmax; left: -25vmax; animation: drift 9s ease-in-out infinite alternate; }
+    body::after { background: #0b8a83; bottom: -35vmax; right: -30vmax; animation: drift 11s ease-in-out infinite alternate-reverse; }
+    @keyframes drift { to { transform: translate(12vmax, 8vmax) scale(1.15); } }
+
+    .splash { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 24px; }
+
+    .logo-wrap { position: relative; width: 132px; height: 132px; margin-bottom: 28px; }
+    .ring {
+      position: absolute; inset: -18px; border-radius: 42px; border: 2px solid rgba(255, 255, 255, .35);
+      animation: ring 2.2s cubic-bezier(.2, .7, .3, 1) .9s infinite; opacity: 0;
+    }
+    .ring.two { animation-delay: 2s; }
+    @keyframes ring { 0% { transform: scale(.85); opacity: .6; } 100% { transform: scale(1.35); opacity: 0; } }
+
+    .logo { position: relative; width: 132px; height: 132px; filter: drop-shadow(0 14px 30px rgba(0, 0, 0, .35)); }
+    .logo .tile { transform-origin: 32px 32px; animation: pop .7s cubic-bezier(.34, 1.56, .64, 1) both; }
+    .logo .sheet { animation: sheet .6s cubic-bezier(.2, .8, .2, 1) .25s both; }
+    .logo .line { stroke-dasharray: 20; stroke-dashoffset: 20; animation: write .45s ease-out forwards; }
+    .logo .line.l1 { animation-delay: .75s; }
+    .logo .line.l2 { animation-delay: .95s; }
+    .logo .line.l3 { stroke-dasharray: 12; stroke-dashoffset: 12; animation-delay: 1.15s; }
+    .logo .clock { transform-origin: 44px 45px; animation: pop .55s cubic-bezier(.34, 1.56, .64, 1) 1.3s both; }
+    .logo .hand-m { transform-origin: 44px 45px; animation: spin 1.6s linear 1.5s infinite; }
+    .logo .hand-h { transform-origin: 44px 45px; animation: spin 9.6s linear 1.5s infinite; }
+    @keyframes pop { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    @keyframes sheet { from { transform: translateY(18px); opacity: 0; } to { transform: none; opacity: 1; } }
+    @keyframes write { to { stroke-dashoffset: 0; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    h1 { margin: 0; font-size: 2rem; letter-spacing: .01em; animation: rise .6s ease-out .5s both; }
+    .sub { margin: 4px 0 30px; opacity: .8; animation: rise .6s ease-out .65s both; }
+    @keyframes rise { from { transform: translateY(10px); opacity: 0; } to { transform: none; opacity: .9; } }
+
+    .bar { position: relative; width: 180px; height: 5px; border-radius: 99px; background: rgba(255, 255, 255, .18); overflow: hidden; animation: rise .6s ease-out .8s both; }
+    .bar span {
+      position: absolute; top: 0; bottom: 0; width: 40%; border-radius: inherit;
+      background: linear-gradient(90deg, transparent, #fff, transparent); animation: slide 1.2s ease-in-out infinite;
+    }
+    @keyframes slide { from { left: -40%; } to { left: 100%; } }
+    .hint { margin: 14px 0 0; font-size: .9rem; opacity: .75; animation: rise .6s ease-out 1s both; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; animation-delay: 0s !important; }
+      .logo .line { stroke-dashoffset: 0; }
+    }
+  </style>
+</head>
+<body>
+  <main class="splash" role="status" aria-live="polite">
+    <div class="logo-wrap">
+      <span class="ring"></span><span class="ring two"></span>
+      <svg class="logo" viewBox="0 0 64 64" aria-hidden="true">
+        <defs>
+          <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#2bb3aa"/><stop offset="1" stop-color="#0d5e60"/>
+          </linearGradient>
+        </defs>
+        <rect class="tile" width="64" height="64" rx="15" fill="url(#bg)"/>
+        <g class="sheet">
+          <path d="M19 11h19l11 11v29a3 3 0 0 1-3 3H19a3 3 0 0 1-3-3V14a3 3 0 0 1 3-3z" fill="#fff"/>
+          <path d="M38 11v8a3 3 0 0 0 3 3h8z" fill="#bfe6e2"/>
+        </g>
+        <g stroke="#9fc2be" stroke-width="2.4" stroke-linecap="round">
+          <path class="line l1" d="M22 28h18"/>
+          <path class="line l2" d="M22 34h18"/>
+          <path class="line l3" d="M22 40h10"/>
+        </g>
+        <g class="clock">
+          <circle cx="44" cy="45" r="10" fill="#0d5e60" stroke="#fff" stroke-width="2.5"/>
+          <path class="hand-h" d="M44 45v-4" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>
+          <path class="hand-m" d="M44 45v-6.5" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="44" cy="45" r="1.4" fill="#fff"/>
+        </g>
+      </svg>
+    </div>
+    <h1>Stundenzettel</h1>
+    <p class="sub">Das digitale Heft</p>
+    <div class="bar" aria-hidden="true"><span></span></div>
+    <p class="hint">Einen Moment, das Heft wird geöffnet …</p>
+  </main>
+  <script src="/js/start.js"></script>
+</body>
+</html>

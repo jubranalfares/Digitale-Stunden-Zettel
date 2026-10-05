@@ -23,8 +23,8 @@ nur ohne Rechnen und ohne ständiges Unterschreiben:
 ## So schreibt man ins Heft
 
 1. Auf einen Tag tippen (im Stundenzettel die Zeile, in der Einsatzliste die Zelle).
-2. Beginn wählen: erst die Stunde, dann die Minuten (:00, :15, :30, :45). Danach geht es von selbst
-   mit dem Ende weiter.
+2. Beginn eintippen, zum Beispiel 1 2 3 0 für 12:30. Nach zwei Ziffern springt die Eingabe von selbst
+   weiter, erst zu den Minuten, dann zum Ende. Eine einzelne 8 reicht für 08 Uhr.
 3. Auf Speichern tippen. Das Fenster schließt sich, der Tag leuchtet kurz grün auf und unten steht,
    wie viele Stunden es waren.
 
@@ -59,7 +59,8 @@ Die Unterschrift ist eine einfache elektronische Signatur; der Steuerberater akz
    Arbeitgeber (geht auch später unter **Einstellungen**).
 4. Unter **Mitarbeiter** jeden mit Name, Benutzername und Startpasswort anlegen.
 5. Mitarbeiter melden sich an, vergeben ein eigenes Passwort und unterschreiben einmal – fertig.
-   Tipp: im Handy-Browser „Zum Startbildschirm hinzufügen“, dann ist das Heft wie eine App da.
+   Tipp: im Handy-Browser „Zum Home-Bildschirm“ hinzufügen, dann ist das Heft wie eine App da,
+   mit eigenem Startbildschirm, der läuft, bis die App geladen ist.
 
 ## Rollen
 
