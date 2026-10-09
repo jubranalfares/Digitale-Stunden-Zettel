@@ -51,6 +51,20 @@
 <% } %>
 
 <% if (isAdmin) { %>
+<div class="card" id="datev">
+  <h2>DATEV</h2>
+  <p class="muted small">Mit diesen Angaben kommt unter „Für Steuerberater“ eine zweite Datei mit. Die liest die Kanzlei direkt in DATEV LODAS ein, dann muss dort niemand die Stunden abtippen. Alle Nummern bekommen Sie von Ihrer Steuerberatung.</p>
+  <form method="post" action="/einstellungen/datev" class="form-grid">
+    <input type="hidden" name="_csrf" value="<%= csrfToken %>">
+    <label>Beraternummer <input name="datev_berater_nr" value="<%= settings.datev_berater_nr %>" inputmode="numeric" pattern="[0-9]{4,7}" maxlength="7" autocomplete="off"></label>
+    <label>Mandantennummer <input name="datev_mandanten_nr" value="<%= settings.datev_mandanten_nr %>" inputmode="numeric" pattern="[0-9]{1,5}" maxlength="5" autocomplete="off"></label>
+    <label>Lohnart für Arbeitsstunden <input name="datev_lohnart" value="<%= settings.datev_lohnart %>" inputmode="numeric" pattern="[0-9]{1,4}" maxlength="4" autocomplete="off"></label>
+    <label>Bearbeitungsschlüssel <input name="datev_bs_nr" value="<%= settings.datev_bs_nr %>" inputmode="numeric" pattern="[0-9]{1,2}" maxlength="2" autocomplete="off"></label>
+    <p class="full muted small" style="margin:0">Dazu braucht jeder Mitarbeiter seine Personalnummer aus DATEV. Die tragen Sie unter <a href="/admin/mitarbeiter">Mitarbeiter</a> ein.</p>
+    <div class="full form-actions"><button class="btn btn-primary" type="submit">Speichern</button></div>
+  </form>
+</div>
+
 <div class="card" id="sicherung">
   <h2>Datensicherung</h2>
   <p class="muted small">Alle Stundenzettel, Unterschriften und Mitarbeiter in einer Datei. Laden Sie die Sicherung am besten einmal im Monat herunter. Arbeitszeitnachweise müssen mindestens zwei Jahre aufbewahrt werden.</p>

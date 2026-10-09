@@ -1,31 +1,44 @@
 <%#
-  PDF für den Steuerberater: wird im Hintergrund erstellt und dann über das Teilen-Menü des Handys
-  verschickt (Mail, WhatsApp, Dateien …). Am Computer wird es heruntergeladen.
+  Für den Steuerberater: PDF (und, wenn eingerichtet, die DATEV-Datei) werden im Hintergrund erstellt und
+  dann zusammen über das Teilen-Menü des Handys verschickt (Mail, WhatsApp, Dateien …).
+  Am Computer werden sie heruntergeladen.
+%>
+<%
+  const fileIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h8l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" fill="currentColor" opacity=".15"/><path d="M14 2v5h5M6 2h8l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+  const files = [{ url: `/pdf?monat=${monthKey(ym)}`, name: pdfFileName, type: 'application/pdf' }];
+  if (datevFileName) files.push({ url: `/datev?monat=${monthKey(ym)}`, name: datevFileName, type: 'text/plain' });
 %>
 <dialog class="entry-dialog pdf-dialog" data-pdf-dialog aria-labelledby="pdf-title">
   <div class="entry-form">
     <header class="entry-head">
       <div>
-        <h2 id="pdf-title" tabindex="-1">PDF für den Steuerberater</h2>
+        <h2 id="pdf-title" tabindex="-1">Für den Steuerberater</h2>
         <div class="entry-name"><%= monthLabel(ym) %></div>
       </div>
       <button type="button" class="entry-close" data-pdf-close aria-label="Schließen">✕</button>
     </header>
     <div class="entry-body">
-      <div class="pdf-file">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h8l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" fill="currentColor" opacity=".15"/><path d="M14 2v5h5M6 2h8l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
-        <div>
-          <strong><%= pdfFileName %></strong>
-          <span data-pdf-status></span>
-        </div>
+      <div class="pdf-files">
+        <% files.forEach((f) => { %>
+          <div class="pdf-file" data-file data-url="<%= f.url %>" data-name="<%= f.name %>" data-type="<%= f.type %>">
+            <%- fileIcon %>
+            <div>
+              <strong><%= f.name %></strong>
+              <span data-file-status></span>
+              <a class="small" data-file-download hidden>Herunterladen</a>
+            </div>
+          </div>
+        <% }) %>
       </div>
-      <p class="muted small" style="margin:12px 0 4px">Darin sind die Einsatzliste und alle Stundenzettel des Monats.</p>
+      <p class="muted small" style="margin:12px 0 4px">
+        Im PDF sind die Einsatzliste und alle Stundenzettel des Monats.
+        <% if (datevFileName) { %>Die DATEV-Datei liest die Kanzlei in LODAS ein.<% } else { %>Die Kanzlei möchte auch eine DATEV-Datei? Das richten Sie in den <a href="/einstellungen#datev">Einstellungen</a> ein.<% } %>
+      </p>
     </div>
     <footer class="entry-foot">
       <div class="entry-error" data-pdf-error role="alert" hidden></div>
       <div class="entry-actions">
         <button type="button" class="btn btn-primary" data-pdf-share disabled>Senden oder sichern</button>
-        <a class="btn btn-primary" data-pdf-download hidden>Herunterladen</a>
       </div>
     </footer>
   </div>

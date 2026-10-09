@@ -445,10 +445,14 @@ input[type="checkbox"] { display: inline-block; width: 20px; min-height: 20px; h
 .entry-actions .btn-delete { color: var(--danger); }
 .entry-actions .btn[hidden] { display: none; }
 
+.pdf-files { display: grid; gap: 10px; }
 .pdf-file { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: 14px; background: var(--surface-2); }
 .pdf-file svg { flex: none; width: 40px; height: 40px; color: var(--accent-strong); }
 .pdf-file strong { display: block; overflow-wrap: anywhere; }
-.pdf-file span { color: var(--muted); font-size: .9rem; }
+.pdf-file span { display: block; color: var(--muted); font-size: .9rem; }
+.pdf-file span.is-error { color: var(--danger); }
+.pdf-file a { display: inline-block; margin-top: 4px; font-weight: 600; }
+.pdf-file a[hidden] { display: none; }
 .pdf-dialog .entry-actions .btn { flex: 1; }
 
 @media (max-width: 640px) {

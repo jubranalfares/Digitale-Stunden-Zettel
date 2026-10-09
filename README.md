@@ -4,13 +4,14 @@ Das Papier-Heft mit den Stundenzetteln – digital. Man schreibt **direkt ins Fo
 nur ohne Rechnen und ohne ständiges Unterschreiben:
 
 - **Mitarbeiter** tippen in ihrem Stundenzettel (*„Vorlage zur Dokumentation der täglichen
-  Arbeitszeit“*) auf einen Tag. Im Eingabefenster wählen sie Beginn und Ende mit großen Knöpfen
-  (erst Stunde, dann Minuten), optional Pause und Kürzel, und tippen auf **Speichern**. Dauer,
+  Arbeitszeit“*) auf einen Tag. Im Eingabefenster tippen sie Beginn und Ende direkt ein
+  (Stunde und Minute) und dann auf **Speichern**. Dauer,
   Monatssumme, „aufgezeichnet am“ und die **Unterschrift** setzt das System.
 - In der **Einsatzliste** (großes Blatt mit allen Mitarbeitern) geht es genauso: Zelle antippen,
   Zeiten wählen, speichern – die Zeile **Summe** rechnet mit.
 - **Der Chef** blättert durch das Heft (Einsatzliste, dann jeder Mitarbeiter), unterschreibt nur einmal
-  und lädt mit **einem Knopf** alles als PDF für den Steuerberater herunter.
+  und schickt mit **einem Knopf** alles an den Steuerberater: das PDF und, wenn eingerichtet, eine
+  Importdatei für DATEV LODAS (siehe [docs/DATEV.md](docs/DATEV.md)).
 
 | Chef: das Heft mit Registern | Mitarbeiter: direkt ins Formular tippen |
 |---|---|
@@ -144,6 +145,12 @@ npm run demo         # nur für Entwicklung: Beispiel-Café in eine leere Datenb
 | `APP_TIMEZONE` | `Europe/Berlin` | Zeitzone für „heute“ und „aufgezeichnet am“ |
 | `TRUST_PROXY` | auf Vercel automatisch | Hinter einem HTTPS-Proxy auf `1` setzen |
 
+## DATEV
+
+Unter **Einstellungen → DATEV** trägt der Chef die Nummern der Kanzlei ein, bei jedem Mitarbeiter
+die Personalnummer. Danach kommt beim Knopf **Für Steuerberater** zum PDF eine Datei für DATEV LODAS
+mit den Monatsstunden je Mitarbeiter dazu. Aufbau, offene Punkte und Probeimport: [docs/DATEV.md](docs/DATEV.md).
+
 ## Datensicherung
 
 Unter **Einstellungen** (Chef) → „Sicherung herunterladen“: eine SQL-Datei mit allen Daten. Am besten
@@ -162,6 +169,7 @@ src/routes/heft.js        Das Heft: Formulare anzeigen, Einträge speichern, PDF
 src/routes/…              Anmeldung, Einstellungen, Mitarbeiter, Inhaber-Bereich
 src/entries.js            Regeln beim Speichern (Rechte, automatische Unterschrift)
 src/sheets.js, pdf.js     Formulardaten und PDF-Erzeugung
+src/datev.js              DATEV-Importdatei (LODAS)
 src/db.js, store.js       Datenbank
 views/, public/           Seiten, Stil, Browser-Skript (Eingabe direkt im Formular, Unterschriftenfeld)
 test/                     Tests, inkl. Online-Datenbank über einen Protokoll-Nachbau

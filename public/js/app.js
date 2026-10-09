@@ -271,30 +271,53 @@
     vv?.addEventListener('scroll', fitDialogs);
     fitDialogs();
 
-    // ---- PDF für den Steuerberater
-    // Auf dem Handy öffnet sich das Teilen-Menü (Mail, WhatsApp, Dateien …), am Computer wird es heruntergeladen.
-    // Wichtig für die App auf dem Home-Bildschirm: Dort hätte ein einfach geöffnetes PDF keinen Teilen-Knopf.
+    // ---- Für den Steuerberater: PDF und, falls eingerichtet, die DATEV-Datei
+    // Auf dem Handy öffnet sich das Teilen-Menü (Mail, WhatsApp, Dateien …) mit beiden Dateien, am Computer
+    // werden sie heruntergeladen. Wichtig für die App auf dem Home-Bildschirm: Dort hätte eine einfach
+    // geöffnete Datei keinen Teilen-Knopf.
     const pdfLink = document.querySelector('[data-pdf]');
     const pdfDialog = document.querySelector('[data-pdf-dialog]');
     if (pdfLink && pdfDialog) {
       const q = (sel) => pdfDialog.querySelector(sel);
-      const status = q('[data-pdf-status]');
       const shareBtn = q('[data-pdf-share]');
-      const downloadLink = q('[data-pdf-download]');
       const pdfError = q('[data-pdf-error]');
-      let file = null;
-      let blobUrl = null;
+      const rows = [...pdfDialog.querySelectorAll('[data-file]')].map((el) => ({
+        el,
+        status: el.querySelector('[data-file-status]'),
+        link: el.querySelector('[data-file-download]'),
+        file: null,
+      }));
+      let ready = [];
 
       const closePdf = () => { if (pdfDialog.close) pdfDialog.close(); else pdfDialog.removeAttribute('open'); };
-      const showPdfError = (message) => {
-        pdfError.textContent = message;
-        pdfError.hidden = false;
-        status.textContent = '';
+      const showDownloads = () => ready.forEach((r) => { r.link.hidden = false; });
+
+      // Eine Datei erstellen lassen. Bei der DATEV-Datei sagt der Server genau, was noch fehlt.
+      const load = async (row) => {
+        const { url, name, type } = row.el.dataset;
+        row.file = null;
+        row.link.hidden = true;
+        row.status.textContent = 'Wird erstellt …';
+        row.status.classList.remove('is-error');
+        try {
+          const res = await fetch(url, { headers: { Accept: `${type}, application/json;q=0.9` } });
+          if (res.status === 422) throw new Error((await res.json()).problems.join(' '));
+          if (!res.ok || (res.headers.get('content-type') || '').includes('html')) throw new Error();
+          const blob = await res.blob();
+          row.file = new File([blob], name, { type });
+          if (row.link.href.startsWith('blob:')) URL.revokeObjectURL(row.link.href);
+          row.link.href = URL.createObjectURL(blob);
+          row.link.download = name;
+          row.status.textContent = `Fertig, ${Math.max(1, Math.round(blob.size / 1024))} KB.`;
+        } catch (err) {
+          row.status.textContent = err.message || 'Hat nicht geklappt. Bitte noch einmal versuchen.';
+          row.status.classList.add('is-error');
+        }
       };
 
       const share = async () => {
         try {
-          await navigator.share({ files: [file], title: pdfLink.dataset.pdfTitle });
+          await navigator.share({ files: ready.map((r) => r.file), title: pdfLink.dataset.pdfTitle });
           closePdf();
           toast('Erledigt.');
         } catch (err) {
@@ -302,48 +325,40 @@
           // dann einfach noch einmal auf den Knopf tippen.
           if (err.name === 'AbortError') return;
           if (err.name === 'NotAllowedError') {
-            status.textContent = 'Fertig. Tippen Sie auf „Senden oder sichern“.';
+            toast('Fertig. Tippen Sie auf „Senden oder sichern“.');
             return;
           }
-          showPdfError('Teilen hat nicht geklappt. Laden Sie das PDF stattdessen herunter.');
-          downloadLink.hidden = false;
+          pdfError.textContent = 'Teilen hat nicht geklappt. Laden Sie die Dateien stattdessen herunter.';
+          pdfError.hidden = false;
+          showDownloads();
         }
       };
 
       pdfLink.addEventListener('click', async (e) => {
         e.preventDefault();
-        status.textContent = 'Wird erstellt …';
         pdfError.hidden = true;
         shareBtn.disabled = true;
         shareBtn.hidden = false;
-        downloadLink.hidden = true;
+        shareBtn.textContent = 'Senden oder sichern';
         fitDialogs();
         if (pdfDialog.showModal) pdfDialog.showModal(); else pdfDialog.setAttribute('open', '');
         q('#pdf-title').focus();
-        try {
-          const res = await fetch(pdfLink.href, { headers: { Accept: 'application/pdf' } });
-          if (!res.ok || !(res.headers.get('content-type') || '').includes('pdf')) throw new Error();
-          const blob = await res.blob();
-          file = new File([blob], pdfLink.dataset.pdfFile, { type: 'application/pdf' });
-          if (blobUrl) URL.revokeObjectURL(blobUrl);
-          blobUrl = URL.createObjectURL(blob);
-          downloadLink.href = blobUrl;
-          downloadLink.download = pdfLink.dataset.pdfFile;
-        } catch {
-          showPdfError('Das PDF konnte nicht erstellt werden. Bitte versuchen Sie es noch einmal.');
-          return;
-        }
-        const size = `${Math.max(1, Math.round(file.size / 1024))} KB`;
-        if (navigator.canShare?.({ files: [file] })) {
-          status.textContent = `Fertig, ${size}.`;
+
+        await Promise.all(rows.map(load));
+        ready = rows.filter((r) => r.file);
+        if (!ready.length) return;
+        // Fehlt etwas (z. B. eine Personalnummer), steht es bei der Datei. Senden geht dann nur bewusst.
+        const complete = ready.length === rows.length;
+        if (!complete) shareBtn.textContent = 'Trotzdem senden';
+
+        if (navigator.canShare?.({ files: ready.map((r) => r.file) })) {
           shareBtn.disabled = false;
-          await share();
+          if (complete) await share();
         } else {
-          // Computer ohne Teilen-Funktion: direkt herunterladen.
+          // Computer ohne Teilen-Funktion: herunterladen.
           shareBtn.hidden = true;
-          downloadLink.hidden = false;
-          downloadLink.click();
-          status.textContent = `Fertig, ${size}. Das PDF wurde heruntergeladen.`;
+          showDownloads();
+          if (complete) ready.forEach((r) => r.link.click());
         }
       });
       shareBtn.addEventListener('click', share);

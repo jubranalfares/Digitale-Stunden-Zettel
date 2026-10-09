@@ -10,6 +10,7 @@
           <tr class="<%= u.active ? '' : 'inactive' %>">
             <td>
               <strong><%= u.name %></strong>
+              <% if (u.personnel_no) { %> <span class="muted small">Pers.-Nr. <%= u.personnel_no %></span><% } %>
               <% if (u.role === 'admin') { %> <span class="chip chip-accent">Chef</span><% } %>
               <% if (!u.active) { %> <span class="chip">inaktiv</span><% } %>
             </td>
@@ -30,8 +31,9 @@
     <input type="hidden" name="_csrf" value="<%= csrfToken %>">
     <label>Vor- und Nachname <input name="name" value="<%= values.name || '' %>" required></label>
     <label>Benutzername <input name="benutzername" value="<%= values.username || '' %>" autocapitalize="none" autocomplete="off" required pattern="[A-Za-z0-9._@\-]{3,40}"></label>
+    <label>Personalnummer <span class="hint">(wie in DATEV, optional)</span> <input name="personalnummer" value="<%= values.personnel_no || '' %>" inputmode="numeric" pattern="[0-9]{1,5}" maxlength="5" autocomplete="off"></label>
     <label>Startpasswort <input name="passwort" value="<%= suggestedPassword %>" minlength="8" required autocomplete="off"></label>
-    <div class="form-actions" style="align-self:end;margin:0"><button class="btn btn-primary" type="submit">Anlegen</button></div>
+    <div class="full form-actions" style="margin:0"><button class="btn btn-primary" type="submit">Anlegen</button></div>
   </form>
   <p class="muted small" style="margin:12px 0 0">Bei der ersten Anmeldung legt der Mitarbeiter ein eigenes Passwort fest und unterschreibt einmal.</p>
 </div>

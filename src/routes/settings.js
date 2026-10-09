@@ -1,6 +1,7 @@
-// Einstellungen: Unterschrift hinterlegen, Passwort ändern, Betriebsdaten (nur Chef).
+// Einstellungen: Unterschrift hinterlegen, Passwort ändern, Betriebsdaten und DATEV (nur Chef).
 import express from 'express';
 import { hashPassword, passwordProblem, requireAdmin, requireLogin, verifyPassword } from '../auth.js';
+import { DATEV_SETTINGS, datevSettingProblem } from '../datev.js';
 import { validImageDataUrl } from '../http.js';
 
 export default function settingsRoutes({ store }) {
@@ -70,6 +71,23 @@ export default function settingsRoutes({ store }) {
     else if (logo) await store.setSetting('logo', logo);
     await req.flash('success', 'Betriebsdaten gespeichert.');
     res.redirect('/einstellungen#betrieb');
+  });
+
+  // Nummern der Kanzlei für die DATEV-Datei. Alles leer lassen heißt: keine DATEV-Datei.
+  router.post('/einstellungen/datev', requireLogin, requireAdmin, async (req, res) => {
+    const values = Object.fromEntries(Object.keys(DATEV_SETTINGS)
+      .map((key) => [key, String(req.body[key] ?? '').replace(/\s+/g, '')]));
+    const problem = Object.entries(values).map(([key, value]) => datevSettingProblem(key, value)).find(Boolean);
+    if (problem) {
+      await req.flash('error', problem);
+      return res.redirect('/einstellungen#datev');
+    }
+    for (const [key, value] of Object.entries(values)) await store.setSetting(key, value);
+    const filled = Object.values(values).filter(Boolean).length;
+    await req.flash('success', filled === Object.keys(values).length
+      ? 'DATEV-Angaben gespeichert. Unter „Für Steuerberater“ kommt die DATEV-Datei ab jetzt mit.'
+      : 'Gespeichert. Die DATEV-Datei gibt es, sobald alle vier Angaben eingetragen sind.');
+    res.redirect('/einstellungen#datev');
   });
 
   return router;

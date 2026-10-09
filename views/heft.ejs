@@ -4,7 +4,7 @@
     <%- include('partials/month-nav', { navBase, ym, isCurrentMonth }) %>
     <% if (isAdmin) { %>
       <a class="btn btn-primary" href="/pdf?monat=<%= monthKey(ym) %>" target="_blank" rel="noopener"
-         data-pdf data-pdf-file="<%= pdfFileName %>" data-pdf-title="Stundenzettel <%= monthLabel(ym) %>">PDF für Steuerberater</a>
+         data-pdf data-pdf-file="<%= pdfFileName %>" data-pdf-title="Stundenzettel <%= monthLabel(ym) %>">Für Steuerberater</a>
     <% } %>
   </div>
 

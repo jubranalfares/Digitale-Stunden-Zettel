@@ -1,6 +1,7 @@
 // Chef-Bereich: Mitarbeiter verwalten und Datensicherung.
 import express from 'express';
 import { generatePassword, hashPassword, passwordProblem, requireAdmin, requireLogin } from '../auth.js';
+import { PERSONNEL_NO } from '../datev.js';
 
 export default function adminRoutes({ store }) {
   const router = express.Router();
@@ -24,6 +25,7 @@ export default function adminRoutes({ store }) {
   const readUserForm = (body) => ({
     name: String(body.name ?? '').trim(),
     username: String(body.benutzername ?? '').trim(),
+    personnel_no: String(body.personalnummer ?? '').replace(/\s+/g, ''),
     on_roster: body.einsatzliste ? 1 : 0,
   });
 
@@ -32,6 +34,12 @@ export default function adminRoutes({ store }) {
     if (!/^[\w.@-]{3,40}$/.test(values.username)) return 'Der Benutzername darf nur Buchstaben, Zahlen sowie . _ - @ enthalten (3 bis 40 Zeichen).';
     const existing = await store.getUserByUsername(values.username);
     if (existing && existing.id !== excludeId) return 'Dieser Benutzername ist bereits vergeben.';
+    if (values.personnel_no) {
+      if (!PERSONNEL_NO.test(values.personnel_no)) return 'Die Personalnummer besteht nur aus Ziffern, so wie in DATEV (1 bis 99999).';
+      const same = (await store.listUsers())
+        .find((u) => u.id !== excludeId && u.personnel_no && Number(u.personnel_no) === Number(values.personnel_no));
+      if (same) return `Die Personalnummer ${values.personnel_no} hat schon ${same.name}.`;
+    }
     return null;
   };
 
@@ -57,6 +65,7 @@ export default function adminRoutes({ store }) {
       passwordHash: await hashPassword(password),
       role: 'employee',
       name: values.name,
+      personnelNo: values.personnel_no,
       mustChangePassword: true,
     });
     await req.flash('success', `${values.name} wurde angelegt.`, [

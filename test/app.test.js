@@ -264,6 +264,69 @@ test('Ein PDF für den Steuerberater', async () => {
   assert.match(page.data, /data-pdf-dialog/);
 });
 
+test('DATEV-Datei: Nummern der Kanzlei, Personalnummern und Export', async () => {
+  const asJson = { headers: { cookie: chef.cookie, accept: 'text/plain, application/json;q=0.9' } };
+  const problems = async (url) => {
+    const res = await fetch(base + url, asJson);
+    assert.equal(res.status, 422);
+    return (await res.json()).problems.join(' ');
+  };
+
+  // Ohne Angaben der Kanzlei gibt es nur das PDF und eine klare Meldung.
+  assert.doesNotMatch((await chef.get('/einsatzliste')).data, /data-url="\/datev/);
+  assert.match(await problems('/datev'), /fehlt noch: Beraternummer, Mandantennummer, Lohnart für Arbeitsstunden, Bearbeitungsschlüssel/);
+
+  await chef.get('/einstellungen');
+  const bad = await chef.follow('/einstellungen/datev', { datev_berater_nr: '12ab', datev_mandanten_nr: '', datev_lohnart: '', datev_bs_nr: '' });
+  assert.match(bad.data, /Beraternummer: bitte nur 4 bis 7 Ziffern/);
+  const saved = await chef.follow('/einstellungen/datev', {
+    datev_berater_nr: '1234567', datev_mandanten_nr: '12345', datev_lohnart: '101', datev_bs_nr: '1',
+  });
+  assert.match(saved.data, /DATEV-Angaben gespeichert/);
+  assert.match(saved.data, /name="datev_berater_nr" value="1234567"/);
+
+  // Personalnummern fehlen noch.
+  assert.match(await problems('/datev'), /Personalnummer fehlt bei Anna Müller, Ben Bauer/);
+
+  const annaUser = await store.getUserByUsername('anna');
+  const benUser = await store.getUserByUsername('ben');
+  const edit = (user, name, personalnummer) => chef.follow(`/admin/mitarbeiter/${user.id}`, {
+    name, benutzername: user.username, personalnummer, einsatzliste: '1', aktiv: '1',
+  });
+  assert.match((await edit(annaUser, 'Anna Müller', '101')).data, /Änderungen gespeichert/);
+  assert.match((await edit(benUser, 'Ben Bauer', '0101')).data, /Die Personalnummer 0101 hat schon Anna Müller/);
+  assert.match((await edit(benUser, 'Ben Bauer', 'B12')).data, /nur aus Ziffern/);
+  assert.match((await edit(benUser, 'Ben Bauer', '102')).data, /Änderungen gespeichert/);
+  assert.match((await chef.get('/admin/mitarbeiter')).data, /Pers\.-Nr\. 101/);
+
+  // Jetzt kommt die DATEV-Datei beim Steuerberater-Knopf mit.
+  const page = await chef.get('/einsatzliste');
+  assert.match(page.data, /data-url="\/datev\?monat=\d{4}-\d{2}" data-name="DATEV_LODAS_[A-Za-z]+_\d{4}\.txt"/);
+
+  const res = await fetch(`${base}/datev`, { headers: { cookie: chef.cookie } });
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type'), /^text\/plain/);
+  assert.match(res.headers.get('content-disposition'), /attachment; filename="DATEV_LODAS_[A-Za-z]+_\d{4}\.txt"/);
+  const text = await res.text();
+  assert.match(text, /^\[Allgemein\]\r\nZiel=LODAS\r\nVersion_SST=1\.0\r\nBeraterNr=1234567\r\nMandantenNr=12345\r\n/);
+
+  // Eine Zeile je Mitarbeiter mit der Monatssumme, genau wie auf dem Stundenzettel.
+  const month = monthKey({ year: y, month: m });
+  const entries = await store.listMonthEntries(month);
+  const hours = (user) => (entries.filter((e) => e.user_id === user.id).reduce((s, e) => s + e.work_minutes, 0) / 60)
+    .toFixed(2).replace('.', ',');
+  const period = `01.${month.slice(5)}.${month.slice(0, 4)}`;
+  const data = text.split('[Bewegungsdaten]\r\n')[1];
+  assert.equal(data, `10;101;${period};${hours(annaUser)};1;101;\r\n10;102;${period};${hours(benUser)};1;101;\r\n`);
+
+  // Monat ohne Stunden, Aufruf ohne JavaScript und Mitarbeiter ohne Chef-Recht.
+  assert.match(await problems('/datev?monat=2026-03'), /keine Stunden/);
+  const html = await chef.get('/datev?monat=2026-03');
+  assert.equal(html.status, 422);
+  assert.match(html.data, /keine Stunden/);
+  assert.equal((await anna.get('/datev')).status, 403);
+});
+
 test('Datensicherung', async () => {
   const res = await chef.get('/admin/sicherung');
   assert.equal(res.status, 200);

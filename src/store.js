@@ -5,6 +5,11 @@ export const DEFAULT_SETTINGS = {
   roster_title: 'Einsatzliste für Minijobber',
   logo: '',
   employer_signature_id: '',
+  // Angaben der Kanzlei für die DATEV-Datei (siehe src/datev.js)
+  datev_berater_nr: '',
+  datev_mandanten_nr: '',
+  datev_lohnart: '',
+  datev_bs_nr: '',
 };
 
 const TABLES = ['settings', 'users', 'signatures', 'entries'];

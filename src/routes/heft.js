@@ -2,14 +2,16 @@
 // erfasst; Dauer, Summen und Unterschriften rechnet das System.
 import express from 'express';
 import { requireAdmin, requireLogin } from '../auth.js';
+import { datevProblems, datevReady, datevRows, lodasFile } from '../datev.js';
 import { canEdit, earliestEditableDate, saveEntry } from '../entries.js';
 import { asciiFileName, currentMonthOf, sendPdf } from '../http.js';
 import { createPdf, drawEmployeeSheet, drawRoster, pdfToBuffer } from '../pdf.js';
 import { buildEmployeeSheet, buildRoster, rosterCell, rosterEmployerSignature } from '../sheets.js';
 import { InputError, isValidISODate, monthKey, monthLabel, monthOf, parseMonth } from '../time.js';
 
-// "Stundenzettel_Oktober_2026.pdf"
+// "Stundenzettel_Oktober_2026.pdf", "DATEV_LODAS_Oktober_2026.txt"
 const pdfFileName = (ym) => `${asciiFileName(`Stundenzettel ${monthLabel(ym)}`)}.pdf`;
+const datevFileName = (ym) => `${asciiFileName(`DATEV LODAS ${monthLabel(ym)}`)}.txt`;
 
 export default function heftRoutes({ store }) {
   const router = express.Router();
@@ -48,6 +50,7 @@ export default function heftRoutes({ store }) {
       editable: (date) => !!date && canEdit(req.user, date, req.today),
       employerSignatureMissing: isAdmin && !res.locals.settings.employer_signature_id,
       pdfFileName: pdfFileName(ym),
+      datevFileName: isAdmin && datevReady(res.locals.settings) ? datevFileName(ym) : null,
       ...rest,
     });
   }
@@ -146,6 +149,25 @@ export default function heftRoutes({ store }) {
       if (u.entry_count > 0) drawEmployeeSheet(doc, await buildEmployeeSheet(store, u, ym));
     }
     sendPdf(res, await pdfToBuffer(doc), pdfFileName(ym));
+  });
+
+  // Für den Steuerberater: Importdatei für DATEV LODAS mit den Stunden des Monats.
+  router.get('/datev', requireLogin, requireAdmin, async (req, res) => {
+    const ym = monthFrom(req);
+    const month = monthKey(ym);
+    const rows = datevRows(await store.employeesForMonth(month), await store.listMonthEntries(month));
+    const problems = datevProblems(res.locals.settings, rows);
+    if (problems.length) {
+      if (req.accepts(['html', 'json']) === 'json') return res.status(422).json({ problems });
+      return res.status(422).render('error', { title: 'DATEV-Datei', message: problems.join(' ') });
+    }
+    res.set({
+      // Die Datei enthält nur Ziffern und Satzzeichen, ist also in jedem Zeichensatz gleich.
+      'Content-Type': 'text/plain; charset=windows-1252',
+      'Content-Disposition': `attachment; filename="${datevFileName(ym)}"`,
+      'Cache-Control': 'private, no-store',
+    });
+    res.send(Buffer.from(lodasFile({ settings: res.locals.settings, ym, rows }), 'latin1'));
   });
 
   return router;
